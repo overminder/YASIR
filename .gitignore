@@ -1,7 +1,11 @@
-# Binaries
+# RPython binaries
 /*-c
+
+# Python
 *.pyc
+__pycache__
 
 # Vim / Emacs
 .*.swp
 .#*
+.dir-locals.el

@@ -1,3 +1,5 @@
+from yasir.oop import W_Fixnum, intern_symbol
+
 def target(config, argl):
     return main, None
 

@@ -7,6 +7,24 @@ class W_Value(object):
         return self.to_repr()
 
 
+# The empty list.
+class W_Nil(W_Value):
+    def to_repr(self):
+        return '#<W_Nil>'
+
+
+w_nil = W_Nil()
+
+
+# An undefined variable's value
+class W_Undefined(W_Value):
+    def to_repr(self):
+        return '#<W_Undefined>'
+
+
+w_undef = W_Undefined()
+
+
 class W_Fixnum(W_Value):
     _immutable_fields_ = '_ival'
 

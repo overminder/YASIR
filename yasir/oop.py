@@ -1,28 +1,38 @@
-class W_Root(object):
-    def __repr__(self):
-        return '#<W_Root>'
+# A heap-allocated value.
+class W_Value(object):
+    def to_repr(self):
+        return '#<W_Value>'
 
-class W_Fixnum(W_Root):
-    _ival = 0
+    def __repr__(self):
+        return self.to_repr()
+
+
+class W_Fixnum(W_Value):
+    _immutable_fields_ = '_ival'
+
     def __init__(self, ival):
+        assert isinstance(ival, int)
         self._ival = ival
 
     def ival(self):
         return self._ival
 
-    def __repr__(self):
+    def to_repr(self):
         return '#<W_Fixnum %d>' % self.ival()
+
 
 def make_symbol_interner(baseclass):
     class W_Symbol(baseclass):
-        _name = '#unnamed-symbol'
+        _immutable_fields_ = ['_name']
+
         def __init__(self, name):
+            assert isinstance(name, str)
             self._name = name
 
         def name(self):
             return self._name
 
-        def __repr__(self):
+        def to_repr(self):
             return '#<W_Symbol %s>' % self.name()
 
     symbols = {}
@@ -36,4 +46,6 @@ def make_symbol_interner(baseclass):
 
     return intern_symbol, W_Symbol
 
-intern_symbol, W_Symbol = make_symbol_interner(W_Root)
+
+intern_symbol, W_Symbol = make_symbol_interner(W_Value)
+del make_symbol_interner

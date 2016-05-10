@@ -1,8 +1,8 @@
 from .ast import Expr, Halt
 from .oop import W_Value
+from .rt import Env, nil_env
 
-
-def interp(expr, env=None):
+def interp(expr, env=nil_env):
     assert isinstance(expr, Expr)
 
     cont = Halt()

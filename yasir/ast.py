@@ -1,6 +1,5 @@
 from yasir import oop
 
-
 class Expr(object):
     def to_repr(self):
         return '#<Expr>'
@@ -61,7 +60,6 @@ class ApplyCont(Cont):
             self._args, self._w_values, self._w_funcval)
 
     def cont(self, w_value, env):
-        print self
         args = self._args
         w_values = self._w_values
         w_funcval = self._w_funcval
@@ -109,25 +107,13 @@ class ReadVar(Expr):
         return '#<ReadVar %s>' % (self._w_sym.to_repr(), )
 
     def evaluate(self, env, cont):
+        #print('ReadVar %s on %s' % (self._w_sym.name(), env))
         from .interp import UndefinedVariable
         w_res = env.lookup(self._w_sym, oop.w_undef)
         if w_res is oop.w_undef:
             raise UndefinedVariable(self._w_sym)
         return cont.cont(w_res, env)
 
-class MakeBox(Expr):
-    def __init__(self, e):
-        self._e = e
-
-    def evaluate(self, env, cont):
-        return self._e, env, BoxCont(cont)
-
-class BoxCont(Cont):
-    def __init__(self, cont):
-        self._cont = Cont
-
-    def cont(self, w_value, env):
-        return self._cont.cont(oop.W_Box(w_value), env)
 
 class Seq(Expr):
     def __init__(self, exprs):
@@ -194,7 +180,7 @@ def make_simple_primop(name, arity, func_w):
     class PrimOp(Expr):
         def __init__(self, *exprs):
             assert len(exprs) == arity
-            self._exprs = exprs
+            self._exprs = list(exprs)
 
         def to_repr(self):
             return '#<PrimOp%s %s>' % (name, self._exprs)
@@ -223,12 +209,21 @@ def make_simple_primop(name, arity, func_w):
             self._w_values[ix] = w_value
             ix += 1
             if ix == arity:
-                w_res = func_w(*self._w_values)
+                w_res = call_func_w(self._w_values)
                 return self._cont.cont(w_res, env)
             else:
                 return self._exprs[ix], env, PrimOpCont(self._w_values, ix, self._exprs, self._cont)
 
     PrimOpCont.__name__ = 'PRimOpCont_%s' % name
+
+    d = {'func_w': func_w}
+    src = '''
+def call_func_w(w_values):
+    return func_w(%s)
+    ''' % ', '.join('w_values[%d]' % i for i in xrange(arity))
+
+    exec src in d
+    call_func_w = d['call_func_w']
 
     return PrimOp
 
@@ -236,12 +231,26 @@ def make_arith_binop(name, func, wrap_result=oop.W_Fixnum):
     def func_w(w_x, w_y):
         assert isinstance(w_x, oop.W_Fixnum)
         assert isinstance(w_y, oop.W_Fixnum)
+        #print('Arith: %s %s %s' % (w_x, name, w_y))
         return wrap_result(func(w_x.ival(), w_y.ival()))
     return make_simple_primop(name, 2, func_w)
 
 Add = make_arith_binop('+', lambda x, y: x + y)
 Sub = make_arith_binop('-', lambda x, y: x - y)
 LessThan = make_arith_binop('<', lambda x, y: x < y, oop.W_Bool.wrap)
+
+MkBox = make_simple_primop('MkBox', 1, oop.W_Box)
+
+def read_box_w(w_value):
+    assert isinstance(w_value, oop.W_Box)
+    return w_value.w_value()
+ReadBox = make_simple_primop('ReadBox', 1, read_box_w)
+
+def write_box_w(w_box, w_value):
+    assert isinstance(w_box, oop.W_Box)
+    w_box.set_w(w_value)
+    return oop.w_nil
+WriteBox = make_simple_primop('WriteBox', 2, write_box_w)
 
 class If(Expr):
     def __init__(self, c, t, f):

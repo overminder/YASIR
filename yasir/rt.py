@@ -14,6 +14,14 @@ class Env(BaseEnv):
         self._w_value = w_value
         self._prev = prev
 
+    def __repr__(self):
+        thiz = self
+        kvs = []
+        while thiz is not nil_env:
+            kvs.append('%s: %s' % (thiz._w_sym.name(), thiz._w_value.to_repr()))
+            thiz = thiz._prev
+        return '{%s}' % ', '.join(kvs)
+
     def lookup(self, w_sym, w_otherwise):
         thiz = self
         while thiz is not nil_env:

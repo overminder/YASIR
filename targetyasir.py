@@ -1,14 +1,12 @@
-from yasir.oop import W_Fixnum, intern_symbol
+from yasir.interp import interp
+from yasir.simple import fibo
 
 def target(config, argl):
     return main, None
 
 def main(argl):
-    print('hello, world')
-    print('argl = %s' % argl)
-    a = intern_symbol('a')
-    a2 = intern_symbol('a')
-    print('a = %s' % a.to_repr())
+    w_res = interp(fibo)
+    print('w_res = %s' % w_res.to_repr())
     return 0
 
 if __name__ == '__main__':

@@ -28,7 +28,7 @@ w_undef = W_Undefined()
 
 
 class W_Fixnum(W_Value):
-    _immutable_fields_ = '_ival'
+    _immutable_fields_ = ['_ival']
 
     def __init__(self, ival):
         assert isinstance(ival, int)
@@ -93,6 +93,9 @@ del make_symbol_interner
 class W_Box(W_Value):
     def __init__(self, w_value):
         self.set_w(w_value)
+
+    def to_repr(self):
+        return '#<W_Box %s>' % self._w_value.to_repr()
 
     def set_w(self, w_value):
         self._w_value = w_value

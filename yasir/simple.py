@@ -16,3 +16,25 @@ def wrap_lit(lit):
 
 def lit_expr(lit):
     return ast.Const(wrap_lit(lit))
+
+def make_fibo():
+    fibo_sym = oop.intern_symbol('fibo')
+    n = oop.intern_symbol('n')
+
+    fibo = ast.Seq([
+        ast.DefineVar(fibo_sym, ast.MkBox(lit_expr(None))),
+        ast.WriteBox(ast.ReadVar(fibo_sym),
+                     ast.Lambda([n],
+                                ast.If(ast.LessThan(ast.ReadVar(n), lit_expr(2)),
+                                       ast.ReadVar(n),
+                                       ast.Add(ast.Apply(ast.ReadBox(ast.ReadVar(fibo_sym)),
+                                                         [ast.Sub(ast.ReadVar(n), lit_expr(1))]),
+                                               ast.Apply(ast.ReadBox(ast.ReadVar(fibo_sym)),
+                                                         [ast.Sub(ast.ReadVar(n), lit_expr(2))]),
+                                               )))),
+        ast.Apply(ast.ReadBox(ast.ReadVar(fibo_sym)), [lit_expr(3)])
+    ])
+
+    return fibo
+
+fibo = make_fibo()

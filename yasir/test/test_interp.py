@@ -2,7 +2,7 @@ import pytest
 
 from yasir import ast, oop
 from yasir.interp import interp
-from yasir.simple import wrap_lit, lit_expr, unknown_lit
+from yasir.simple import wrap_lit, lit_expr, unknown_lit, fibo
 
 def assert_evaluates_to_lit(expr, lit):
     w_res = interp(expr)
@@ -53,5 +53,18 @@ def test_const_lambda():
         ast.Apply(ast.Lambda([x], ast.ReadVar(x)), [lit_expr(42)]), 42)
 
 def test_if():
-    assert_evaluates_to_lit(
-        ast.If(lit_expr(False), lit_expr(0), lit_expr(42)), 42)
+    assert_evaluates_to_lit(ast.If(lit_expr(False), lit_expr(0), lit_expr(42)), 42)
+
+def test_lessthan():
+    assert_evaluates_to_lit(ast.LessThan(lit_expr(1), lit_expr(2)), True)
+    assert_evaluates_to_lit(ast.LessThan(lit_expr(2), lit_expr(1)), False)
+
+def test_box():
+    x = oop.intern_symbol('x')
+    assert_evaluates_to_lit(ast.Seq([
+        ast.DefineVar(x, ast.MkBox(lit_expr(0))),
+        ast.WriteBox(ast.ReadVar(x), lit_expr(42)),
+        ast.ReadBox(ast.ReadVar(x))
+    ]), 42)
+
+def test_fibo(): assert_evaluates_to_lit(fibo, 55)

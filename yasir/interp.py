@@ -8,6 +8,7 @@ def interp(expr, env=nil_env):
     cont = Halt()
     try:
         while True:
+            # print('interp: %s %s %s' % (expr, env, cont))
             expr, env, cont = expr.evaluate(env, cont)
     except HaltException as e:
         return e.w_value()

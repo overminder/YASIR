@@ -1,5 +1,11 @@
 # Contains nothing.
 class BaseEnv(object):
+    def __repr__(self):
+        return self.to_repr()
+
+    def to_repr(self):
+        return '#<Env {}>'
+
     def lookup(self, w_sym, w_otherwise):
         return w_otherwise
 
@@ -14,13 +20,13 @@ class Env(BaseEnv):
         self._w_value = w_value
         self._prev = prev
 
-    def __repr__(self):
+    def to_repr(self):
         thiz = self
         kvs = []
         while thiz is not nil_env:
             kvs.append('%s: %s' % (thiz._w_sym.name(), thiz._w_value.to_repr()))
             thiz = thiz._prev
-        return '{%s}' % ', '.join(kvs)
+        return '#<Env {%s}>' % ', '.join(kvs)
 
     def lookup(self, w_sym, w_otherwise):
         thiz = self

@@ -1,5 +1,6 @@
 from yasir import oop
 
+
 class Expr(object):
     def to_repr(self):
         return '#<Expr>'
@@ -42,15 +43,16 @@ class Apply(Expr):
         self._args = args
 
     def to_repr(self):
-        return '#<Apply %s %s>' % (self._func.to_repr(), self._args.to_repr())
+        return '#<Apply %s %s>' % (self._func.to_repr(), self._args)
 
     def evaluate(self, env, cont):
-        return self._func, env, ApplyCont(self._args, cont, [])
+        return self._func, env, ApplyCont(self._args, env, cont, [])
 
 
 class ApplyCont(Cont):
-    def __init__(self, args, cont, w_values, w_funcval=None):
+    def __init__(self, args, orig_env, cont, w_values, w_funcval=None):
         self._args = args
+        self._orig_env = orig_env
         self._cont = cont
         self._w_values = w_values
         self._w_funcval = w_funcval
@@ -74,11 +76,23 @@ class ApplyCont(Cont):
             next_arg_ix += 1
 
         if len(args) == next_arg_ix:
-            # Fully saturated.
-            return w_funcval.call(w_values, self._cont)
+            # Fully saturated: enter.
+            return w_funcval.call(w_values, ReturnCont(self._orig_env,
+                                                       self._cont))
         else:
-            return args[next_arg_ix], env, ApplyCont(args, self._cont,
-                                                     w_values, w_funcval)
+            cont = ApplyCont(args, self._orig_env, self._cont, w_values,
+                             w_funcval)
+            return args[next_arg_ix], env, cont
+
+
+# That restores the caller's env and cont.
+class ReturnCont(Cont):
+    def __init__(self, env, cont):
+        self._env = env
+        self._cont = cont
+
+    def cont(self, w_value, env_unused):
+        return self._cont.cont(w_value, self._env)
 
 
 class DefineVar(Expr):
@@ -95,6 +109,21 @@ class DefineVar(Expr):
 
     def evaluate(self, env, cont):
         return self._expr, env, DefineVarCont(self._w_sym, cont)
+
+
+class DefineVarCont(Cont):
+    def __init__(self, w_sym, cont):
+        assert isinstance(w_sym, oop.W_Symbol)
+        assert isinstance(cont, Cont)
+
+        self._w_sym = w_sym
+        self._cont = cont
+
+    def to_repr(self):
+        return '#<DefineVarCont %s>' % self._w_sym
+
+    def cont(self, w_value, env):
+        return self._cont.cont(oop.w_nil, env.extend(self._w_sym, w_value))
 
 
 class ReadVar(Expr):
@@ -120,7 +149,7 @@ class Seq(Expr):
         self._exprs = exprs
 
     def to_repr(self):
-        return '#<Seq %s>' % (self._exprs,)
+        return '#<Seq %s>' % (self._exprs, )
 
     def evaluate(self, env, cont):
         es = self._exprs
@@ -150,19 +179,8 @@ class SeqCont(Cont):
         if self._ix == len(self._es):
             return self._cont.cont(w_value, env)
         else:
-            return self._es[self._ix], env, SeqCont(self._ix + 1, self._es, self._cont)
-
-
-class DefineVarCont(Cont):
-    def __init__(self, w_sym, cont):
-        assert isinstance(w_sym, oop.W_Symbol)
-        assert isinstance(cont, Cont)
-
-        self._w_sym = w_sym
-        self._cont = cont
-
-    def cont(self, w_value, env):
-        return self._cont.cont(oop.w_nil, env.extend(self._w_sym, w_value))
+            return self._es[self._ix], env, SeqCont(self._ix + 1, self._es,
+                                                    self._cont)
 
 
 class Const(Expr):
@@ -189,7 +207,8 @@ def make_simple_primop(name, arity, func_w):
             if arity == 0:
                 return cont.cont(func_w(), env)
             else:
-                return self._exprs[0], env, PrimOpCont([None] * arity, 0, self._exprs, cont)
+                return self._exprs[0], env, PrimOpCont(
+                    [None] * arity, 0, self._exprs, cont)
 
     PrimOp.__name__ = 'PrimOp%s' % name
 
@@ -201,7 +220,8 @@ def make_simple_primop(name, arity, func_w):
             self._cont = cont
 
         def to_repr(self):
-            return '#<PrimOpCont%s %s>' % (name, self._exprs)
+            return '#<PrimOpCont%s %s @%d>' % (name, self._exprs,
+                                               self._current_ix)
 
         def cont(self, w_value, env):
             # XXX: Mutation
@@ -212,7 +232,8 @@ def make_simple_primop(name, arity, func_w):
                 w_res = call_func_w(self._w_values)
                 return self._cont.cont(w_res, env)
             else:
-                return self._exprs[ix], env, PrimOpCont(self._w_values, ix, self._exprs, self._cont)
+                return self._exprs[ix], env, PrimOpCont(
+                    self._w_values, ix, self._exprs, self._cont)
 
     PrimOpCont.__name__ = 'PRimOpCont_%s' % name
 
@@ -227,13 +248,16 @@ def call_func_w(w_values):
 
     return PrimOp
 
+
 def make_arith_binop(name, func, wrap_result=oop.W_Fixnum):
     def func_w(w_x, w_y):
         assert isinstance(w_x, oop.W_Fixnum)
         assert isinstance(w_y, oop.W_Fixnum)
         #print('Arith: %s %s %s' % (w_x, name, w_y))
         return wrap_result(func(w_x.ival(), w_y.ival()))
+
     return make_simple_primop(name, 2, func_w)
+
 
 Add = make_arith_binop('+', lambda x, y: x + y)
 Sub = make_arith_binop('-', lambda x, y: x - y)
@@ -241,16 +265,23 @@ LessThan = make_arith_binop('<', lambda x, y: x < y, oop.W_Bool.wrap)
 
 MkBox = make_simple_primop('MkBox', 1, oop.W_Box)
 
+
 def read_box_w(w_value):
     assert isinstance(w_value, oop.W_Box)
     return w_value.w_value()
+
+
 ReadBox = make_simple_primop('ReadBox', 1, read_box_w)
+
 
 def write_box_w(w_box, w_value):
     assert isinstance(w_box, oop.W_Box)
     w_box.set_w(w_value)
     return oop.w_nil
+
+
 WriteBox = make_simple_primop('WriteBox', 2, write_box_w)
+
 
 class If(Expr):
     def __init__(self, c, t, f):

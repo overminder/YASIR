@@ -2,6 +2,8 @@ from yasir import oop
 
 
 class Expr(object):
+    _immutable_ = True
+
     def to_repr(self):
         return '#<Expr>'
 
@@ -14,6 +16,8 @@ class Expr(object):
 
 
 class Cont(object):
+    _immutable_ = True
+
     def to_repr(self):
         return '#<Cont>'
 
@@ -26,6 +30,8 @@ class Cont(object):
 
 
 class Lambda(Expr):
+    _immutable_ = True
+
     def __init__(self, w_argnames, body):
         self._w_argnames = w_argnames
         self._body = body
@@ -38,6 +44,8 @@ class Lambda(Expr):
 
 
 class Apply(Expr):
+    _immutable_ = True
+
     def __init__(self, func, args):
         self._func = func
         self._args = args
@@ -50,6 +58,8 @@ class Apply(Expr):
 
 
 class ApplyCont(Cont):
+    _immutable_ = True
+
     def __init__(self, args, orig_env, cont, w_values, w_funcval=None):
         self._args = args
         self._orig_env = orig_env
@@ -87,6 +97,8 @@ class ApplyCont(Cont):
 
 # That restores the caller's env and cont.
 class ReturnCont(Cont):
+    _immutable_ = True
+
     def __init__(self, env, cont):
         self._env = env
         self._cont = cont
@@ -96,6 +108,8 @@ class ReturnCont(Cont):
 
 
 class DefineVar(Expr):
+    _immutable_ = True
+
     def __init__(self, w_sym, expr):
         assert isinstance(w_sym, oop.W_Symbol)
         assert isinstance(expr, Expr)
@@ -112,6 +126,8 @@ class DefineVar(Expr):
 
 
 class DefineVarCont(Cont):
+    _immutable_ = True
+
     def __init__(self, w_sym, cont):
         assert isinstance(w_sym, oop.W_Symbol)
         assert isinstance(cont, Cont)
@@ -127,6 +143,8 @@ class DefineVarCont(Cont):
 
 
 class ReadVar(Expr):
+    _immutable_ = True
+
     def __init__(self, w_sym):
         assert isinstance(w_sym, oop.W_Symbol)
 
@@ -145,6 +163,8 @@ class ReadVar(Expr):
 
 
 class Seq(Expr):
+    _immutable_ = True
+
     def __init__(self, exprs):
         self._exprs = exprs
 
@@ -167,6 +187,8 @@ class Seq(Expr):
 
 
 class SeqCont(Cont):
+    _immutable_ = True
+
     def __init__(self, ix, es, cont):
         self._ix = ix
         self._es = es
@@ -184,6 +206,8 @@ class SeqCont(Cont):
 
 
 class Const(Expr):
+    _immutable_ = True
+
     def __init__(self, w_value):
         self._w_value = w_value
 
@@ -196,6 +220,8 @@ class Const(Expr):
 
 def make_simple_primop(name, arity, func_w):
     class PrimOp(Expr):
+        _immutable_ = True
+
         def __init__(self, *exprs):
             assert len(exprs) == arity
             self._exprs = list(exprs)
@@ -213,6 +239,8 @@ def make_simple_primop(name, arity, func_w):
     PrimOp.__name__ = 'PrimOp%s' % name
 
     class PrimOpCont(Cont):
+        _immutable_ = True
+
         def __init__(self, w_values, current_ix, exprs, cont):
             self._w_values = w_values
             self._current_ix = current_ix
@@ -284,6 +312,8 @@ WriteBox = make_simple_primop('WriteBox', 2, write_box_w)
 
 
 class If(Expr):
+    _immutable_ = True
+
     def __init__(self, c, t, f):
         self._c = c
         self._t = t
@@ -297,6 +327,8 @@ class If(Expr):
 
 
 class IfCont(Cont):
+    _immutable_ = True
+
     def __init__(self, t, f, cont):
         self._t = t
         self._f = f
@@ -314,6 +346,8 @@ class IfCont(Cont):
 
 
 class Halt(Cont):
+    _immutable_ = True
+
     def to_repr(self):
         return '#<Halt>'
 

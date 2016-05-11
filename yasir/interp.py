@@ -1,6 +1,9 @@
+from rpython.rlib import jit
+
 from .ast import Expr, Halt
 from .oop import W_Value
 from .rt import Env, nil_env
+from .jit import jitdriver
 
 def interp(expr, env=nil_env):
     assert isinstance(expr, Expr)
@@ -8,6 +11,7 @@ def interp(expr, env=nil_env):
     cont = Halt()
     try:
         while True:
+            jitdriver.jit_merge_point(expr=expr, env=env, cont=cont)
             # print('interp: %s %s %s' % (expr, env, cont))
             expr, env, cont = expr.evaluate(env, cont)
     except HaltException as e:

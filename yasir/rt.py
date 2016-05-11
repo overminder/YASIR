@@ -1,5 +1,7 @@
 # Contains nothing.
 class BaseEnv(object):
+    _immutable_ = True
+
     def __repr__(self):
         return self.to_repr()
 
@@ -15,7 +17,9 @@ class BaseEnv(object):
 nil_env = BaseEnv()
 
 class Env(BaseEnv):
-    def __init__(self, w_sym, w_value, prev=None):
+    _immutable_ = True
+
+    def __init__(self, w_sym, w_value, prev):
         self._w_sym = w_sym
         self._w_value = w_value
         self._prev = prev
@@ -29,10 +33,7 @@ class Env(BaseEnv):
         return '#<Env {%s}>' % ', '.join(kvs)
 
     def lookup(self, w_sym, w_otherwise):
-        thiz = self
-        while thiz is not nil_env:
-            if thiz._w_sym is w_sym:
-                return thiz._w_value
-            else:
-                thiz = thiz._prev
-        return w_otherwise
+        if self._w_sym is w_sym:
+            return self._w_value
+        else:
+            return self._prev.lookup(w_sym, w_otherwise)

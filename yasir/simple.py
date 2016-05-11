@@ -1,10 +1,14 @@
+from rpython.rlib.objectmodel import specialize
+
 from yasir import ast, oop
 
 
+@specialize.argtype(0)
 def unknown_lit(lit):
     return TypeError('Unknown lit %r for type %r' % (lit, type(lit)))
 
 
+@specialize.argtype(0)
 def wrap_lit(lit):
     if lit is None:
         w_value = oop.w_nil
@@ -17,6 +21,7 @@ def wrap_lit(lit):
     return w_value
 
 
+@specialize.argtype(0)
 def lit_expr(lit):
     return ast.Const(wrap_lit(lit))
 

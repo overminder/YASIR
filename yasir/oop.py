@@ -1,3 +1,5 @@
+from rpython.rlib import jit
+
 # A heap-allocated value.
 class W_Value(object):
     def to_repr(self):
@@ -28,7 +30,7 @@ w_undef = W_Undefined()
 
 
 class W_Fixnum(W_Value):
-    _immutable_fields_ = ['_ival']
+    _immutable_ = True
 
     def __init__(self, ival):
         assert isinstance(ival, int)
@@ -63,7 +65,7 @@ w_false = W_Bool()
 
 def make_symbol_interner(baseclass):
     class W_Symbol(baseclass):
-        _immutable_fields_ = ['_name']
+        _immutable_ = True
 
         def __init__(self, name):
             assert isinstance(name, str)
@@ -104,6 +106,8 @@ class W_Box(W_Value):
         return self._w_value
 
 class W_Lambda(W_Value):
+    _immutable_ = True
+
     def __init__(self, w_argnames, body, env):
         self._w_argnames = w_argnames
         self._body = body
@@ -112,11 +116,11 @@ class W_Lambda(W_Value):
     def to_repr(self):
         return '#<W_Lambda %s>' % (self._w_argnames,)
 
+    @jit.unroll_safe
     def call(self, w_argvalues, cont):
         from .rt import Env
 
         assert len(w_argvalues) == len(self._w_argnames)
-        # TODO: Unroll
 
         # Populate env.
         env = self._env

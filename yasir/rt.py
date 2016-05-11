@@ -1,15 +1,18 @@
+from rpython.rlib import jit
+
+from . import pretty
+
 # Contains nothing.
-class BaseEnv(object):
+class BaseEnv(pretty.PrettyBase):
     _immutable_ = True
 
-    def __repr__(self):
-        return self.to_repr()
+    def to_pretty(self):
+        return pretty.atom('#env')
 
-    def to_repr(self):
-        return '#<Env {}>'
-
-    def lookup(self, w_sym, w_otherwise):
-        return w_otherwise
+    #@jit.elidable
+    def lookup(self, w_sym):
+        from interp import UndefinedVariable
+        raise UndefinedVariable(w_sym)
 
     def extend(self, w_sym, w_value):
         return Env(w_sym, w_value, self)
@@ -24,16 +27,18 @@ class Env(BaseEnv):
         self._w_value = w_value
         self._prev = prev
 
-    def to_repr(self):
+    def to_pretty(self):
         thiz = self
         kvs = []
-        while thiz is not nil_env:
-            kvs.append('%s: %s' % (thiz._w_sym.name(), thiz._w_value.to_repr()))
+        while isinstance(thiz, Env):
+            kvs.append(pretty.atom(':' + thiz._w_sym.name()))
+            kvs.append(thiz._w_value)
             thiz = thiz._prev
-        return '#<Env {%s}>' % ', '.join(kvs)
+        return pretty.atom('#env').extend(kvs)
 
-    def lookup(self, w_sym, w_otherwise):
+    #@jit.elidable
+    def lookup(self, w_sym):
         if self._w_sym is w_sym:
             return self._w_value
         else:
-            return self._prev.lookup(w_sym, w_otherwise)
+            return self._prev.lookup(w_sym)

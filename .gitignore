@@ -1,5 +1,7 @@
-# RPython binaries
+# RPython binaries and logs
 /*-c
+/bin
+/log
 
 # Python
 *.pyc

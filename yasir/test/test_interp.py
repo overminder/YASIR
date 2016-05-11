@@ -53,7 +53,7 @@ def test_const_lambda():
     x = oop.intern_symbol('x')
     assert_evaluates_to_lit(
         ast.Apply(
-            ast.Lambda([x], ast.ReadVar(x)), [lit_expr(42)]), 42)
+            ast.LambdaInfo('', [x], ast.ReadVar(x)), [lit_expr(42)]), 42)
 
 
 def test_if():

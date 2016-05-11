@@ -41,7 +41,7 @@ def make_fibo(arg):
 
     fibo = ast.Seq([
         ast.DefineVar(fibo_sym, ast.MkBox(lit_expr(None))), ast.WriteBox(
-            ast.ReadVar(fibo_sym), ast.Lambda(
+            ast.ReadVar(fibo_sym), ast.LambdaInfo('fibo',
                 [n], fibo_body)), ast.Apply(
                     ast.ReadBox(ast.ReadVar(fibo_sym)), [lit_expr(arg)])
     ])
@@ -56,7 +56,7 @@ def make_loop_sum(arg):
 
     loop = ast.Seq([
         ast.DefineVar(loop_sym, ast.MkBox(lit_expr(None))), ast.WriteBox(
-            ast.ReadVar(loop_sym), ast.Lambda(
+            ast.ReadVar(loop_sym), ast.LambdaInfo('loop-sum',
                 [n, s], ast.If(
                     ast.LessThan(
                         ast.ReadVar(n), lit_expr(1)),

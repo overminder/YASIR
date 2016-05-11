@@ -1,20 +1,19 @@
 from rpython.rlib import jit
 
-# A heap-allocated value.
-class W_Value(object):
-    def to_repr(self):
-        return '#<W_Value>'
+from . import pretty
 
-    def __repr__(self):
-        return self.to_repr()
+# A heap-allocated value.
+class W_Value(pretty.PrettyBase):
+    def to_pretty(self):
+        return pretty.atom('#<W_Value>')
 
     def to_bool(self):
         return True
 
 # The empty list.
 class W_Nil(W_Value):
-    def to_repr(self):
-        return '#<W_Nil>'
+    def to_pretty(self):
+        return pretty.nil()
 
 
 w_nil = W_Nil()
@@ -22,8 +21,8 @@ w_nil = W_Nil()
 
 # An undefined variable's value
 class W_Undefined(W_Value):
-    def to_repr(self):
-        return '#<W_Undefined>'
+    def to_pretty(self):
+        return pretty.atom('#<undef>')
 
 
 w_undef = W_Undefined()
@@ -39,16 +38,17 @@ class W_Fixnum(W_Value):
     def ival(self):
         return self._ival
 
-    def to_repr(self):
-        return '#<W_Fixnum %d>' % self.ival()
+    def to_pretty(self):
+        return pretty.atom(self._ival)
 
 
 class W_Bool(W_Value):
-    def to_repr(self):
+    def to_pretty(self):
         if self is w_false:
-            return '#f'
+            s = '#f'
         else:
-            return '#t'
+            s = '#t'
+        return pretty.atom(s)
 
     def to_bool(self):
         return self is not w_false
@@ -74,8 +74,8 @@ def make_symbol_interner(baseclass):
         def name(self):
             return self._name
 
-        def to_repr(self):
-            return '#<W_Symbol %s>' % self.name()
+        def to_pretty(self):
+            return pretty.atom(self._name)
 
     symbols = {}
 
@@ -96,35 +96,26 @@ class W_Box(W_Value):
     def __init__(self, w_value):
         self.set_w(w_value)
 
-    def to_repr(self):
-        return '#<W_Box %s>' % self._w_value.to_repr()
+    def to_pretty(self):
+        return pretty.atom('#box').append(self._w_value)
 
     def set_w(self, w_value):
         self._w_value = w_value
 
     def w_value(self):
-        return self._w_value
+        # XXX Not very true.
+        return jit.promote(self._w_value)
 
 class W_Lambda(W_Value):
     _immutable_ = True
 
-    def __init__(self, w_argnames, body, env):
-        self._w_argnames = w_argnames
-        self._body = body
+    def __init__(self, info, env):
+        self._info = info
         self._env = env
 
-    def to_repr(self):
-        return '#<W_Lambda %s>' % (self._w_argnames,)
+    def to_pretty(self):
+        return pretty.atom('#lambda').append(self._info.name())
 
-    @jit.unroll_safe
     def call(self, w_argvalues, cont):
-        from .rt import Env
-
-        assert len(w_argvalues) == len(self._w_argnames)
-
-        # Populate env.
-        env = self._env
-        for i in range(len(w_argvalues)):
-            env = env.extend(self._w_argnames[i], w_argvalues[i])
-
-        return self._body, env, cont
+        body, env = self._info.build_expr_and_env(w_argvalues, self._env)
+        return body, env, cont

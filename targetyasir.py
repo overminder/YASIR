@@ -12,7 +12,7 @@ def main(argl):
     except (IndexError, TypeError) as e:
         n = 10
     w_res = interp(make_fibo(n))
-    print('fibo(%d) = %s' % (n, w_res.to_repr()))
+    print('fibo(%d) = %s' % (n, w_res.to_pretty_string()))
     return 0
 
 def jitpolicy(driver):

@@ -31,22 +31,22 @@ def make_fibo(arg):
     n = oop.intern_symbol('n')
 
     fibo_body = ast.If(
-        ast.LessThan(
-            ast.ReadVar(n), lit_expr(2)), ast.ReadVar(n), ast.Add(
-                ast.Apply(
-                    ast.ReadBox(ast.ReadVar(fibo_sym)), [ast.Sub(
-                        ast.ReadVar(n), lit_expr(1))]), ast.Apply(
-                            ast.ReadBox(ast.ReadVar(fibo_sym)), [ast.Sub(
-                                ast.ReadVar(n), lit_expr(2))])))
+        ast.LessThan(ast.ReadVar(0), lit_expr(2)),
+        ast.ReadVar(0),
+        ast.Add(ast.Apply(ast.ReadBox(ast.ReadVar(1, 1)),
+                          [ast.Sub(ast.ReadVar(0), lit_expr(1))]),
+                ast.Apply(ast.ReadBox(ast.ReadVar(1, 1)),
+                          [ast.Sub(ast.ReadVar(0), lit_expr(2))])))
 
-    fibo = ast.Seq([
-        ast.DefineVar(fibo_sym, ast.MkBox(lit_expr(None))), ast.WriteBox(
-            ast.ReadVar(fibo_sym), ast.LambdaInfo('fibo',
-                [n], fibo_body)), ast.Apply(
-                    ast.ReadBox(ast.ReadVar(fibo_sym)), [lit_expr(arg)])
-    ])
+    fibo_def = ast.LambdaInfo('fibo_main', 1, 1, ast.Seq([
+        ast.WriteBox(ast.ReadVar(1), ast.LambdaInfo('fibo',
+                                                    1, 0, fibo_body)),
+        ast.Apply(ast.ReadBox(ast.ReadVar(1)), [ast.ReadVar(0)]),
+    ]))
 
-    return fibo
+    fibo_main = ast.Apply(fibo_def, [lit_expr(arg)])
+
+    return fibo_main
 
 
 def make_loop_sum(arg):

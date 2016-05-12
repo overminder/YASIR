@@ -103,7 +103,8 @@ class W_Box(W_Value):
         self._w_value = w_value
 
     def w_value(self):
-        # XXX Not very true.
+        # Constant box promotion is performance crucial.
+        # XXX Need to use the version trick.
         return jit.promote(self._w_value)
 
 class W_Lambda(W_Value):

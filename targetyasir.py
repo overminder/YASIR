@@ -1,3 +1,5 @@
+#!/usr/bin/env pypy
+
 from rpython.jit.codewriter.policy import JitPolicy
 
 from yasir.interp import interp

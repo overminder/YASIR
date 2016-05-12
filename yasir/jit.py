@@ -7,6 +7,6 @@ def get_printable_location(expr):
 
 jitdriver = jit.JitDriver(greens=['expr'],
                           reds=['env', 'cont'],
-                          should_unroll_one_iteration=lambda *args: True,
+                          #should_unroll_one_iteration=lambda *args: True,
                           get_printable_location=get_printable_location)
                           # is_recursive=True)

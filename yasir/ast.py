@@ -228,12 +228,14 @@ class Const(Expr):
 
 
 def make_simple_primop(name, arity, func_w):
+    call_func_w = make_unpack_arg_func(arity, func_w)
+
     class PrimOp(Expr):
         _immutable_ = True
 
         def __init__(self, *exprs):
             assert len(exprs) == arity
-            self._exprs = exprs
+            self._exprs = list(exprs)
 
         def to_pretty(self):
             return pretty.atom('#%s' % name.lower()).extend(self._exprs)
@@ -249,7 +251,6 @@ def make_simple_primop(name, arity, func_w):
 
     class PrimOpCont(Cont):
         _immutable_ = True
-        _virtualizables_ = ['_w_values[*]', '_current_ix', '_exprs', 'cont']
 
         def __init__(self, w_values, current_ix, exprs, cont):
             self._w_values = w_values
@@ -275,6 +276,9 @@ def make_simple_primop(name, arity, func_w):
 
     PrimOpCont.__name__ = 'PrimOpCont_%s' % name
 
+    return PrimOp
+
+def make_unpack_arg_func(argc, func):
     d = {'func_w': func_w}
     src = '''
 def call_func_w(w_values):
@@ -284,29 +288,27 @@ def call_func_w(w_values):
     exec src in d
     call_func_w = d['call_func_w']
 
-    return PrimOp
-
-
 # Specialize more.
-def make_simple_primop_v2(name, arity, func_w):
+def make_simple_primop(name, arity, func_w):
     expr_init_args = ['e%d' % i for i in xrange(arity)]
     expr_fields = ['self._%s' % v for v in expr_init_args]
-    exec_env = {
+    expr_src_fmt = {
         'args': ', '.join(expr_init_args),
         'fields': ', '.join(expr_fields),
-        'pretty_appends': ', '.join('.append(%s)' % f for f in expr_fields),
+        'pretty_appends': ''.join('.append(%s)' % f for f in expr_fields),
         'evaluate_to': 'cont.cont(func_w(), env)' if arity == 0 else \
-          'self._e0, env, PrimOpCont0(%s, cont)' % ', '.join(expr_fields[1:])
+          'self._e0, env, PrimOpCont0(self, cont)'
     }
-    exec_env.update(locals())
+    exec_env = dict(locals())
+    exec_env['pretty'] = pretty
     expr_src = '''
 def __init__(self, %(args)s):
     %(fields)s = %(args)s
 def to_pretty(self):
-    return pretty.atom('#%s' % name.lower())%(pretty_appends)s
+    return pretty.atom('#%%s' %% name.lower())%(pretty_appends)s
 def evaluate(self, env, cont):
     return %(evaluate_to)s
-    ''' % exec_env
+    ''' % expr_src_fmt
 
     exec expr_src in exec_env
 
@@ -322,38 +324,55 @@ def evaluate(self, env, cont):
         class PrimOpCont(Cont):
             _immutable_ = True
 
+        next_ix = i + 1
+        scoped_name = 'PrimOpCont%d' % i
+        next_scoped_name = 'PrimOpCont%d' % next_ix
+        exec_env[scoped_name] = PrimOpCont
+
+        PrimOpCont.__name__ = 'PrimOpCont%s%d' % (name, i)
+
+        w_values = ['w_value%d' % nth for nth in xrange(i)]
+        value_fields = ', '.join('self._%s' % v for v in w_values)
+        value_fields_with_comma = '' if value_fields == '' else value_fields + ', '
+        w_values_with_comma = '' if i == 0 else (', '.join(w_values) + ', ')
+        cont_more = '''self._expr._e%(next_ix)d, env, %(next_scoped_name)s(
+            %(value_fields_with_comma)s w_value, self._expr, self._cont)''' % {
+                'next_ix': next_ix,
+                'value_fields_with_comma': value_fields_with_comma,
+                'next_scoped_name': next_scoped_name,
+            }
+        cont_saturated = 'self._cont.cont(func_w(%s w_value), env)' % value_fields_with_comma
+        cont = cont_more if i != arity - 1 else cont_saturated
+        cont_src_fmt = {
+            'i': i,
+            'w_values_with_comma': w_values_with_comma,
+            'assign_fields': '' if i == 0 else '%s = %s' % (value_fields, ', '.join(w_values)),
+            'value_fields': value_fields,
+            'cont': cont,
+        }
+
         cont_src = '''
-def __init__(self, w_values, current_ix, exprs, cont):
-    self._w_values = w_values
-    self._current_ix = current_ix
-    self._exprs = exprs
+def __init__(self, %(w_values_with_comma)sexpr, cont):
+    %(assign_fields)s
+    self._expr = expr
     self._cont = cont
 
-        def to_pretty(self):
-            return pretty.atom('#%s-cont' % name.lower())\
-                         .append_kw('ix', self._current_ix).extend(self._exprs)
+def to_pretty(self):
+    return pretty.atom('#%%s-cont' %% name.lower())\
+                    .append_kw('ix', %(i)d).append_kw('expr', self._expr)
 
-        def cont(self, w_value, env):
-            # XXX: Mutation
-            ix = self._current_ix
-            self._w_values[ix] = w_value
-            ix += 1
-            if ix == arity:
-                w_res = call_func_w(self._w_values)
-                return self._cont.cont(w_res, env)
-            else:
-                return self._exprs[ix], env, PrimOpCont(
-                    self._w_values, ix, self._exprs, self._cont)
-'''
-        if i == arity - 1:
-            # Saturated.
-            pass
-        else:
-            # Not yet.
-            pass
-        if i == 0:
-            pass
+def cont(self, w_value, env):
+    return %(cont)s
+        ''' % cont_src_fmt
 
+        #print expr_src
+        #print cont_src
+
+        exec cont_src in exec_env
+        for attr in  ['__init__', 'to_pretty', 'cont']:
+            setattr(PrimOpCont, attr, exec_env[attr])
+
+    return PrimOp
 
 def make_arith_binop(name, func, wrap_result=oop.W_Fixnum):
     def func_w(w_x, w_y):

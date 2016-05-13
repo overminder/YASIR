@@ -1,6 +1,6 @@
 import pytest
 
-from yasir import ast, oop
+from yasir import ast, oop, config
 from yasir.interp import interp
 from yasir.simple import wrap_lit, lit_expr, unknown_lit, make_fibo, make_loop_sum
 
@@ -51,9 +51,11 @@ def xtest_define_readvar():
 
 def test_const_lambda():
     x = oop.intern_symbol('x')
-    assert_evaluates_to_lit(
-        ast.Apply(
-            ast.LambdaInfo('', 1, 0, ast.ReadVar(0)), [lit_expr(42)]), 42)
+    if config.USE_LINKED_ENV:
+        info = ast.LambdaInfo('', [x], ast.ReadVar(x))
+    else:
+        info = ast.LambdaInfo('', 1, 0, ast.ReadVar(0))
+    assert_evaluates_to_lit(ast.Apply(info, [lit_expr(42)]), 42)
 
 
 def test_if():

@@ -3,7 +3,7 @@ import inspect
 from rpython.rlib import jit
 from rpython.rlib.unroll import unrolling_iterable
 
-from . import oop, pretty
+from . import oop, pretty, config
 from .rt import Env, EnvTypeMismatch
 
 class Expr(pretty.PrettyBase):
@@ -44,14 +44,20 @@ class Cont(pretty.PrettyBase):
 class LambdaInfo(Expr):
     _immutable_ = True
 
-    def __init__(self, name, arity, extra_frame_slots, body):
-        assert arity >= 0
-        assert extra_frame_slots >= 0
+    if config.USE_LINKED_ENV:
+        def __init__(self, name, w_argnames, body):
+            self._name = name
+            self._w_argnames = w_argnames
+            self._body = body
+    else:
+        def __init__(self, name, arity, extra_frame_slots, body):
+            assert arity >= 0
+            assert extra_frame_slots >= 0
 
-        self._name = name
-        self._arity = arity
-        self._frame_size = arity + extra_frame_slots
-        self._body = body
+            self._name = name
+            self._arity = arity
+            self._frame_size = arity + extra_frame_slots
+            self._body = body
 
     def to_pretty(self):
         return pretty.atom('#lambda-info').append(self._name)
@@ -63,15 +69,24 @@ class LambdaInfo(Expr):
     def build_expr_and_env(self, w_argvalues, env):
         from .rt import Env
 
-        arity = self._arity
+        if config.USE_LINKED_ENV:
+            arity = len(self._w_argnames)
+        else:
+            arity = self._arity
         assert len(w_argvalues) == arity
-        frame = [None] * self._frame_size
-        for i in range(arity):
-            frame[i] = w_argvalues[i]
-        for i in range(self._frame_size - arity):
-            frame[arity + i] = oop.W_Box(oop.w_undef)
 
-        return self._body, Env.extend(env, frame)
+        if config.USE_LINKED_ENV:
+            w_argnames = self._w_argnames
+            for i in range(arity):
+                env = Env.extend(env, w_argnames[i], w_argvalues[i])
+        else:
+            frame = [None] * self._frame_size
+            for i in range(arity):
+                frame[i] = w_argvalues[i]
+            for i in range(self._frame_size - arity):
+                frame[arity + i] = oop.W_Box(oop.w_undef)
+            env = Env.extend(env, frame)
+        return self._body, env
 
     def evaluate(self, env, cont):
         return cont.cont(oop.W_Lambda(self, env), env)
@@ -147,59 +162,71 @@ class ReturnCont(Cont):
         return self._cont.cont(w_value, self._env)
 
 
-'''
-class DefineVar(Expr):
-    _immutable_ = True
+if config.USE_LINKED_ENV:
+    class DefineVar(Expr):
+        _immutable_ = True
 
-    def __init__(self, ix, expr):
-        assert isinstance(expr, Expr)
+        def __init__(self, w_sym, expr):
+            assert isinstance(expr, Expr)
 
-        self._ix = ix
-        self._expr = expr
+            self._w_sym = w_sym
+            self._expr = expr
 
-    def to_pretty(self):
-        return pretty.atom('#define').append_kw('ix', self._ix).append(self._expr)
+        def to_pretty(self):
+            return pretty.atom('#define').append(self._w_sym).append(self._expr)
 
-    def evaluate(self, env, cont):
-        return self._expr, env, DefineVarCont(self._ix, cont)
+        def evaluate(self, env, cont):
+            return self._expr, env, DefineVarCont(self._w_sym, cont)
 
 
-class DefineVarCont(Cont):
-    _immutable_ = True
+    class DefineVarCont(Cont):
+        _immutable_ = True
 
-    def __init__(self, ix, cont):
-        assert isinstance(cont, Cont)
+        def __init__(self, w_sym, cont):
+            assert isinstance(cont, Cont)
 
-        self._ix = ix
-        self._cont = cont
+            self._w_sym = w_sym
+            self._cont = cont
 
-    def to_pretty(self):
-        return pretty.atom('#define-cont').append(self._ix)
+        def to_pretty(self):
+            return pretty.atom('#define-cont').append(self._w_sym)
 
-    def cont(self, w_value, env):
-        env.set(w_value, self._ix)
-        return self._cont.cont(oop.w_nil, env)
-'''
+        def cont(self, w_value, env):
+            env = Env.extend(env, self._w_sym, w_value)
+            # env.set_at(self._w_sym, w_value)
+            return self._cont.cont(oop.w_nil, env)
+
 
 class ReadVar(Expr):
     _immutable_ = True
 
-    def __init__(self, ix, depth=0):
-        self._ix = ix
-        self._depth = depth
+    if config.USE_LINKED_ENV:
+        def __init__(self, w_sym):
+            self._w_sym = w_sym
 
-    def to_pretty(self):
-        return pretty.atom('#readvar').append_kw('ix', self._ix)\
-                                      .append_kw('depth', self._depth)
+        def to_pretty(self):
+            return pretty.atom('#readvar').append(self._w_sym)
 
-    def evaluate(self, env, cont):
-        #print('ReadVar %s on %s' % (self._w_sym.name(), env))
-        try:
-            res = env.get_fixnum(self._ix, self._depth)
-            return cont.cont_fixnum(res, env)
-        except EnvTypeMismatch as e:
-            w_res = env.get(self._ix, self._depth)
+        def evaluate(self, env, cont):
+            w_res = env.lookup(self._w_sym)
             return cont.cont(w_res, env)
+    else:
+        def __init__(self, ix, depth=0):
+            self._ix = ix
+            self._depth = depth
+
+        def to_pretty(self):
+            return pretty.atom('#readvar').append_kw('ix', self._ix)\
+                                        .append_kw('depth', self._depth)
+
+        def evaluate(self, env, cont):
+            #print('ReadVar %s on %s' % (self._w_sym.name(), env))
+            try:
+                res = env.get_fixnum(self._ix, self._depth)
+                return cont.cont_fixnum(res, env)
+            except EnvTypeMismatch as e:
+                w_res = env.get(self._ix, self._depth)
+                return cont.cont(w_res, env)
 
 
 class Seq(Expr):

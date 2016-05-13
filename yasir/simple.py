@@ -1,6 +1,6 @@
 from rpython.rlib.objectmodel import specialize
 
-from . import ast, oop, config
+from . import ast, oop
 
 @specialize.argtype(0)
 def unknown_lit(lit):
@@ -25,62 +25,58 @@ def lit_expr(lit):
     return ast.Const(wrap_lit(lit))
 
 
-def make_fibo(arg):
+def make_make_fibo():
     fibo_sym = oop.intern_symbol('fibo')
     n = oop.intern_symbol('n')
 
-    if config.USE_LINKED_ENV:
-        read_fibo = ast.ReadVar(fibo_sym)
-        read_n = ast.ReadVar(n)
-    else:
-        read_fibo = ast.ReadVar(1, 1)
-        read_n = ast.ReadVar(0)
+    # It's crucial that any sharing between the AST nodes should be prohibited as
+    # that will confuse the JIT's loop finder.
+    mk_read_fibo = lambda: ast.ReadVar(1, 1)
+    mk_read_n = lambda: ast.ReadVar(0)
 
-    fibo_body = ast.If(
-        ast.LessThan(read_n, lit_expr(2)),
-        read_n,
-        ast.Add(ast.Apply(ast.ReadBox(read_fibo),
-                          [ast.Sub(read_n, lit_expr(1))]),
-                ast.Apply(ast.ReadBox(read_fibo),
-                          [ast.Sub(read_n, lit_expr(2))])))
+    def make_fibo(arg):
+        fibo_body = ast.If(
+            ast.LessThan(mk_read_n(), lit_expr(2)),
+            mk_read_n(),
+            ast.Add(ast.Apply(ast.ReadBox(mk_read_fibo()),
+                            [ast.Sub(mk_read_n(), lit_expr(1))]),
+                    ast.Apply(ast.ReadBox(mk_read_fibo()),
+                            [ast.Sub(mk_read_n(), lit_expr(2))])))
 
-    if config.USE_LINKED_ENV:
-        arg_sym = oop.intern_symbol('arg')
-        fibo_def = ast.LambdaInfo('fibo_main', [arg_sym], ast.Seq([
-            ast.DefineVar(fibo_sym, ast.MkBox(ast.Const(oop.w_nil))),
-            ast.WriteBox(read_fibo, ast.LambdaInfo('fibo', [n], fibo_body)),
-            ast.Apply(ast.ReadBox(read_fibo), [ast.ReadVar(arg_sym)]),
-        ]))
-    else:
         fibo_def = ast.LambdaInfo('fibo_main', 1, 1, ast.Seq([
             ast.WriteBox(ast.ReadVar(1), ast.LambdaInfo('fibo',
                                                         1, 0, fibo_body)),
             ast.Apply(ast.ReadBox(ast.ReadVar(1)), [ast.ReadVar(0)]),
         ]))
 
-    fibo_main = ast.Apply(fibo_def, [lit_expr(arg)])
+        fibo_main = ast.Apply(fibo_def, [lit_expr(arg)])
+        return fibo_main
 
-    return fibo_main
+    return make_fibo
+
+make_fibo = make_make_fibo()
+del make_make_fibo
 
 
-def make_loop_sum(arg):
-    loop_sym = oop.intern_symbol('loop_sum')
-    n = oop.intern_symbol('n')
-    s = oop.intern_symbol('s')
+def make_make_loop_sum():
+    mk_read_loop = lambda: ast.ReadVar(1, 1)
+    mk_read_n = lambda: ast.ReadVar(0)
+    mk_read_s = lambda: ast.ReadVar(1)
 
-    loop = ast.Seq([
-        ast.DefineVar(loop_sym, ast.MkBox(lit_expr(None))), ast.WriteBox(
-            ast.ReadVar(loop_sym), ast.LambdaInfo('loop-sum',
-                [n, s], ast.If(
-                    ast.LessThan(
-                        ast.ReadVar(n), lit_expr(1)),
-                    ast.ReadVar(s),
-                    ast.Apply(
-                        ast.ReadBox(ast.ReadVar(loop_sym)), [ast.Sub(
-                            ast.ReadVar(n), lit_expr(1)), ast.Add(
-                                ast.ReadVar(n), ast.ReadVar(s))]), ))),
-        ast.Apply(
-            ast.ReadBox(ast.ReadVar(loop_sym)), [lit_expr(arg), lit_expr(0)])
-    ])
+    def make_loop_sum(arg):
+        loop_body = ast.If(ast.LessThan(mk_read_n(), lit_expr(1)),
+                           mk_read_s(),
+                           ast.Apply(ast.ReadBox(mk_read_loop()),
+                                     [ast.Sub(mk_read_n(), lit_expr(1)),
+                                      ast.Add(mk_read_n(), mk_read_s())], is_tail=True))
+        loop_trampo = ast.LambdaInfo('loop-sum-main', 1, 1, ast.Seq([
+            ast.WriteBox(ast.ReadVar(1), ast.LambdaInfo('loop-sum', 2, 0, loop_body)),
+            ast.Apply(ast.ReadBox(ast.ReadVar(1)), [ast.ReadVar(0), lit_expr(0)]),
+        ]))
 
-    return loop
+        return ast.Apply(loop_trampo, [lit_expr(arg)])
+
+    return make_loop_sum
+
+make_loop_sum = make_make_loop_sum()
+del make_make_loop_sum

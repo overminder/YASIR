@@ -3,7 +3,7 @@
 from rpython.jit.codewriter.policy import JitPolicy
 
 from yasir.interp import interp
-from yasir.simple import make_fibo
+from yasir.simple import make_fibo, make_loop_sum
 
 def target(config, argl):
     return main, None
@@ -11,10 +11,18 @@ def target(config, argl):
 def main(argl):
     try:
         n = int(argl[1])
+        kind = argl[2]
     except (IndexError, TypeError) as e:
         n = 10
-    w_res = interp(make_fibo(n))
-    print('fibo(%d) = %s' % (n, w_res.to_pretty_string()))
+        kind = 'fibo'
+
+    if kind == 'fibo':
+        mk = make_fibo
+    else:
+        mk = make_loop_sum
+
+    w_res = interp(mk(n))
+    print('%s(%d) = %s' % (kind, n, w_res.to_pretty_string()))
     return 0
 
 def jitpolicy(driver):

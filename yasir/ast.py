@@ -3,11 +3,13 @@ import inspect
 from rpython.rlib import jit
 from rpython.rlib.unroll import unrolling_iterable
 
-from . import oop, pretty, config
-from .rt import Env, EnvTypeMismatch
+from . import oop, pretty
+from .cont import Cont, label
+from .rt import Env
 
 class Expr(pretty.PrettyBase):
     _immutable_ = True
+    should_enter = True
 
     def to_pretty(self):
         return pretty.atom('#<Expr>')
@@ -16,48 +18,17 @@ class Expr(pretty.PrettyBase):
         assert isinstance(cont, Cont)
         raise NotImplementedError('Expr.evaluate: abstract method')
 
-
-class Cont(pretty.PrettyBase):
-    _immutable_ = True
-
-    def to_pretty(self):
-        return pretty.atom('#<Cont>')
-
-    def cont(self, w_value, env):
-        if isinstance(w_value, oop.W_Fixnum):
-            return self.cont_fixnum(w_value.ival(), env)
-        if isinstance(w_value, oop.W_Bool):
-            return self.cont_bool(w_value.to_bool(), env)
-        else:
-            return self.cont_any(w_value, env)
-
-    def cont_fixnum(self, value, env):
-        return self.cont_any(oop.W_Fixnum(value), env)
-
-    def cont_bool(self, value, env):
-        return self.cont_any(oop.W_Bool.wrap(value), env)
-
-    def cont_any(self, w_value, env):
-        assert isinstance(w_value, oop.W_Value)
-        raise NotImplementedError('Cont.cont: abstract method')
-
 class LambdaInfo(Expr):
     _immutable_ = True
 
-    if config.USE_LINKED_ENV:
-        def __init__(self, name, w_argnames, body):
-            self._name = name
-            self._w_argnames = w_argnames
-            self._body = body
-    else:
-        def __init__(self, name, arity, extra_frame_slots, body):
-            assert arity >= 0
-            assert extra_frame_slots >= 0
+    def __init__(self, name, arity, extra_frame_slots, body):
+        assert arity >= 0
+        assert extra_frame_slots >= 0
 
-            self._name = name
-            self._arity = arity
-            self._frame_size = arity + extra_frame_slots
-            self._body = body
+        self._name = name
+        self._arity = arity
+        self._frame_size = arity + extra_frame_slots
+        self._body = body
 
     def to_pretty(self):
         return pretty.atom('#lambda-info').append(self._name)
@@ -69,47 +40,44 @@ class LambdaInfo(Expr):
     def build_expr_and_env(self, w_argvalues, env):
         from .rt import Env
 
-        if config.USE_LINKED_ENV:
-            arity = len(self._w_argnames)
-        else:
-            arity = self._arity
+        arity = self._arity
         assert len(w_argvalues) == arity
 
-        if config.USE_LINKED_ENV:
-            w_argnames = self._w_argnames
-            for i in range(arity):
-                env = Env.extend(env, w_argnames[i], w_argvalues[i])
-        else:
-            frame = [None] * self._frame_size
-            for i in range(arity):
-                frame[i] = w_argvalues[i]
-            for i in range(self._frame_size - arity):
-                frame[arity + i] = oop.W_Box(oop.w_undef)
-            env = Env.extend(env, frame)
+        frame = [None] * self._frame_size
+        for i in range(arity):
+            frame[i] = w_argvalues[i]
+        for i in range(self._frame_size - arity):
+            frame[arity + i] = oop.W_Box(oop.w_undef)
+        env = Env.extend(env, frame)
         return self._body, env
 
+    #@label
     def evaluate(self, env, cont):
-        return cont.cont(oop.W_Lambda(self, env), env)
+        return cont.plug_reduce(oop.W_Lambda(self, env), env)
 
 
 class Apply(Expr):
     _immutable_ = True
 
-    def __init__(self, func, args):
+    def __init__(self, func, args, is_tail=False):
         self._func = func
         self._args = args
+        self._is_tail = is_tail
 
     def to_pretty(self):
-        return pretty.atom('#apply').append(self._func).extend(self._args)
+        return pretty.atom('#apply') \
+                     .append_kw('tail', self._is_tail) \
+                     .append(self._func).extend(self._args)
 
     def evaluate(self, env, cont):
-        return self._func, env, ApplyCont(self._args, env, cont, [])
+        return self._func, env, ApplyCont(self._is_tail, self._args, env, cont, [])
 
 
 class ApplyCont(Cont):
     _immutable_ = True
 
-    def __init__(self, args, orig_env, cont, w_values, w_funcval=None):
+    def __init__(self, is_tail, args, orig_env, cont, w_values, w_funcval=None):
+        self._is_tail = is_tail
         self._args = args
         self._orig_env = orig_env
         self._cont = cont
@@ -117,10 +85,12 @@ class ApplyCont(Cont):
         self._w_funcval = w_funcval
 
     def to_pretty(self):
-        return pretty.atom('#apply-cont').append(self._w_funcval).extend(
-            self._w_values)
+        return pretty.atom('#apply-cont') \
+                     .append_kw('tail', self._is_tail) \
+                     .append(self._w_funcval) \
+                     .extend(self._w_values)
 
-    def cont_any(self, w_value, env):
+    def plug_reduce(self, w_value, env):
         args = self._args
         w_values = self._w_values
         w_funcval = self._w_funcval
@@ -136,10 +106,14 @@ class ApplyCont(Cont):
 
         if len(args) == next_arg_ix:
             # Fully saturated: enter.
-            return w_funcval.call(w_values, ReturnCont(self._orig_env,
-                                                       self._cont))
+            if self._is_tail:
+                assert isinstance(self._cont, ReturnCont)  # XXX: Is this true?
+                cont = self._cont
+            else:
+                cont = ReturnCont(self._orig_env, self._cont)
+            return w_funcval.call(w_values, cont)
         else:
-            cont = ApplyCont(args, self._orig_env, self._cont, w_values,
+            cont = ApplyCont(self._is_tail, args, self._orig_env, self._cont, w_values,
                              w_funcval)
             return args[next_arg_ix], env, cont
 
@@ -155,78 +129,25 @@ class ReturnCont(Cont):
     def to_pretty(self):
         return pretty.atom('#return-cont')
 
-    def cont_fixnum(self, value, env_unused):
-        return self._cont.cont_fixnum(value, self._env)
-
-    def cont_any(self, w_value, env_unused):
-        return self._cont.cont(w_value, self._env)
-
-
-if config.USE_LINKED_ENV:
-    class DefineVar(Expr):
-        _immutable_ = True
-
-        def __init__(self, w_sym, expr):
-            assert isinstance(expr, Expr)
-
-            self._w_sym = w_sym
-            self._expr = expr
-
-        def to_pretty(self):
-            return pretty.atom('#define').append(self._w_sym).append(self._expr)
-
-        def evaluate(self, env, cont):
-            return self._expr, env, DefineVarCont(self._w_sym, cont)
-
-
-    class DefineVarCont(Cont):
-        _immutable_ = True
-
-        def __init__(self, w_sym, cont):
-            assert isinstance(cont, Cont)
-
-            self._w_sym = w_sym
-            self._cont = cont
-
-        def to_pretty(self):
-            return pretty.atom('#define-cont').append(self._w_sym)
-
-        def cont(self, w_value, env):
-            env = Env.extend(env, self._w_sym, w_value)
-            # env.set_at(self._w_sym, w_value)
-            return self._cont.cont(oop.w_nil, env)
-
+    @label
+    def plug_reduce(self, w_value, env_unused):
+        return self._cont.plug_reduce(w_value, self._env)
 
 class ReadVar(Expr):
     _immutable_ = True
 
-    if config.USE_LINKED_ENV:
-        def __init__(self, w_sym):
-            self._w_sym = w_sym
+    def __init__(self, ix, depth=0):
+        self._ix = ix
+        self._depth = depth
 
-        def to_pretty(self):
-            return pretty.atom('#readvar').append(self._w_sym)
+    def to_pretty(self):
+        return pretty.atom('#readvar').append_kw('ix', self._ix)\
+                                    .append_kw('depth', self._depth)
 
-        def evaluate(self, env, cont):
-            w_res = env.lookup(self._w_sym)
-            return cont.cont(w_res, env)
-    else:
-        def __init__(self, ix, depth=0):
-            self._ix = ix
-            self._depth = depth
-
-        def to_pretty(self):
-            return pretty.atom('#readvar').append_kw('ix', self._ix)\
-                                        .append_kw('depth', self._depth)
-
-        def evaluate(self, env, cont):
-            #print('ReadVar %s on %s' % (self._w_sym.name(), env))
-            try:
-                res = env.get_fixnum(self._ix, self._depth)
-                return cont.cont_fixnum(res, env)
-            except EnvTypeMismatch as e:
-                w_res = env.get(self._ix, self._depth)
-                return cont.cont(w_res, env)
+    def evaluate(self, env, cont):
+        assert isinstance(env, Env)
+        w_res = env.get(self._ix, self._depth)
+        return cont.plug_reduce(w_res, env)
 
 
 class Seq(Expr):
@@ -243,7 +164,7 @@ class Seq(Expr):
         nes = len(es)
         if nes == 0:
             # Zero exprs
-            return cont.cont(oop.w_nil, env)
+            return cont.plug_reduce(oop.w_nil, env)
 
         e = es[0]
         if nes == 1:
@@ -265,13 +186,12 @@ class SeqCont(Cont):
         return pretty.atom('#seq-cont').append_kw('ix',
                                                   self._ix).extend(self._es)
 
-    def cont_any(self, w_value, env):
+    def plug_reduce(self, w_value, env):
         if self._ix == len(self._es):
-            return self._cont.cont(w_value, env)
+            return self._cont.plug_reduce(w_value, env)
         else:
             return self._es[self._ix], env, SeqCont(self._ix + 1, self._es,
                                                     self._cont)
-
 
 class Const(Expr):
     _immutable_ = True
@@ -283,7 +203,7 @@ class Const(Expr):
         return pretty.atom('#const').append(self._w_value)
 
     def evaluate(self, env, cont):
-        return cont.cont(self._w_value, env)
+        return cont.plug_reduce(self._w_value, env)
 
 # Simplified and with specialized cont.
 def make_simple_primop(name, func_w, argtypes=None):
@@ -325,7 +245,7 @@ def make_simple_primop(name, func_w, argtypes=None):
 
         def evaluate(self, env, cont):
             if arity == 0:
-                return cont.cont(func_w(), env)
+                return cont.plug_reduce(func_w(), env)
             else:
                 _, first_expr_field = expr_fields[0]
                 return getattr(self, first_expr_field), env, cont_classes[0](self, cont)
@@ -343,9 +263,9 @@ def make_simple_primop(name, func_w, argtypes=None):
         unrolling_value_fields = unrolling_iterable(value_fields)
 
         if argtypes[nth] is oop.W_Fixnum:
-            cont_method_name = 'cont_fixnum'
+            unwrap_arg = unwrap_fixnum
         else:
-            cont_method_name = 'cont'
+            unwrap_arg = lambda x: x
 
         class PrimOpCont(Cont):
             _immutable_ = True
@@ -361,21 +281,19 @@ def make_simple_primop(name, func_w, argtypes=None):
                 return pretty.atom('#%s-cont' % name)\
                                 .append_kw('ix', i).append_kw('op', self._op)
 
-        def cont_method(self, value, env):
-            values = ()
-            for _, value_field in unrolling_value_fields:
-                values += (getattr(self, value_field),)
-            values += (value,)
-            if nth == arity - 1:
-                # Saturated.
-                return self._cont.cont(func_w(*values), env)
-            else:
-                mk_cont = cont_classes[nth + 1]
-                cont = mk_cont(self._op, self._cont, *values)
-                _, next_expr_field = expr_fields[nth + 1]
-                return getattr(self._op, next_expr_field), env, cont
-
-        setattr(PrimOpCont, cont_method_name, cont_method)
+            def plug_reduce(self, w_value, env):
+                values = ()
+                for _, value_field in unrolling_value_fields:
+                    values += (getattr(self, value_field),)
+                values += (unwrap_arg(w_value),)
+                if nth == arity - 1:
+                    # Saturated.
+                    return self._cont.plug_reduce(func_w(*values), env)
+                else:
+                    mk_cont = cont_classes[nth + 1]
+                    cont = mk_cont(self._op, self._cont, *values)
+                    _, next_expr_field = expr_fields[nth + 1]
+                    return getattr(self._op, next_expr_field), env, cont
 
         PrimOpCont.__name__ = 'PrimOpCont%d%s' % (nth, name)
         return PrimOpCont
@@ -434,6 +352,7 @@ class If(Expr):
         return self._c, env, IfCont(self._t, self._f, cont)
 
 
+
 class IfCont(Cont):
     _immutable_ = True
 
@@ -445,7 +364,7 @@ class IfCont(Cont):
     def to_pretty(self):
         return pretty.atom('#if-cont').append(self._t).append(self._f)
 
-    def cont_any(self, w_value, env):
+    def plug_reduce(self, w_value, env):
         if w_value.to_bool():
             e = self._t
         else:
@@ -453,12 +372,4 @@ class IfCont(Cont):
         return e, env, self._cont
 
 
-class Halt(Cont):
-    _immutable_ = True
 
-    def to_pretty(self):
-        return pretty.atom('#halt')
-
-    def cont_any(self, w_value, env):
-        from .interp import HaltException
-        raise HaltException(w_value)

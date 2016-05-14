@@ -3,6 +3,7 @@
 from rpython.jit.codewriter.policy import JitPolicy
 
 from yasir.interp import interp
+from yasir.cereal import deserialize_ast_from_file
 from yasir.simple import make_fibo, make_loop_sum
 
 def target(config, argl):
@@ -10,19 +11,25 @@ def target(config, argl):
 
 def main(argl):
     try:
-        n = int(argl[1])
-        kind = argl[2]
-    except (IndexError, TypeError) as e:
-        n = 10
-        kind = 'fibo'
+        (kind, args) = argl[1:]
+        if kind == 'fibo':
+            n = int(args)
+            expr = make_fibo(n)
+            comment = 'fibo(%d)' % n
+        elif kind == 'loop':
+            n = int(args)
+            expr = make_loop_sum(n)
+            comment = 'loop-sum(%d)' % n
+        elif kind == 'run-file':
+            expr = deserialize_ast_from_file(args)
+            comment = spec
+    except (IndexError, ValueError) as e:
+        print 'USAGE: %s KIND ARGS' % argl[0]
+        print '  where KIND is one of (fibo | loop | run-file)'
+        return 1
 
-    if kind == 'fibo':
-        mk = make_fibo
-    else:
-        mk = make_loop_sum
-
-    w_res = interp(mk(n))
-    print('%s(%d) = %s' % (kind, n, w_res.to_pretty_string()))
+    w_res = interp(expr)
+    print('%s => %s' % (comment, w_res.to_pretty_string()))
     return 0
 
 def jitpolicy(driver):

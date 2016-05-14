@@ -97,7 +97,7 @@ class ApplyCont(Cont):
         next_arg_ix = len(w_values)
         if w_funcval is None:
             assert isinstance(w_value, oop.W_Lambda)
-            w_funcval = w_value
+            w_funcval = jit.promote(w_value)
         else:
             assert len(args) > next_arg_ix
             w_more = w_values + [w_value]
@@ -231,6 +231,8 @@ def make_simple_primop(name, func_w, argtypes=None):
 
     class PrimOp(Expr):
         _immutable_ = True
+
+        ctor_arity = arity
 
         def __init__(self, *exprs):
             assert len(exprs) == arity

@@ -10,11 +10,14 @@ class W_Value(pretty.PrettyBase):
     def to_bool(self):
         return True
 
+    # Structural equality.
+    def equals(self, w_rhs):
+        return self is w_rhs
+
 # The empty list.
 class W_Nil(W_Value):
     def to_pretty(self):
         return pretty.nil()
-
 
 w_nil = W_Nil()
 
@@ -41,6 +44,10 @@ class W_Fixnum(W_Value):
     def to_pretty(self):
         return pretty.atom(self._ival)
 
+    def equals(self, w_rhs):
+        if isinstance(w_rhs, W_Fixnum):
+            return self.ival() == w_rhs.ival()
+        return False
 
 class W_Bool(W_Value):
     def to_pretty(self):
@@ -103,9 +110,10 @@ class W_Box(W_Value):
         self._w_value = w_value
 
     def w_value(self):
+        return self._w_value
         # Constant box promotion is performance crucial.
         # XXX Need to use the version trick.
-        return jit.promote(self._w_value)
+        # return jit.promote(self._w_value)
 
 class W_Lambda(W_Value):
     _immutable_ = True

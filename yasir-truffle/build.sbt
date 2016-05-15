@@ -3,9 +3,13 @@ scalaVersion := "2.10.6"
 libraryDependencies ++= Seq(
   "com.oracle.truffle" % "truffle-api" % "0.13",
   "com.oracle.truffle" % "truffle-dsl-processor" % "0.13",
-  "org.scalactic" %% "scalactic" % "2.2.6",
-  "org.scalatest" %% "scalatest" % "2.2.6" % "test"
+  "junit" % "junit" % "4.12" % "test"
 )
+
+managedSourceDirectories in Compile += baseDirectory.value / "target" / "scala-2.10" / "classes"
+
+// So that the annotation processors can run.
+compileOrder := CompileOrder.JavaThenScala
 
 import java.util.Properties
 
@@ -22,9 +26,10 @@ javaOptions += localProperties.value.getProperty("bootcpOpt")
 javaOptions ++= Seq(
   // These used to be '-G:+${NAME}' (and require -XX:+UnlockDiagnosticVMOptions)
   // rather than '-Dgraal.${NAME}=true'...
-  "-Dgraal.TraceTruffleCompilationDetails=true",
-  "-Dgraal.TraceTruffleInlining=true",
-  "-Dgraal.TraceTruffleTransferToInterpreter=true"
+  //"-Dgraal.TraceTruffleCompilationDetails=true",
+  //"-Dgraal.TraceTruffleInlining=true",
+  "-Dgraal.TraceTruffleTransferToInterpreter=true",
+  "-Dgraal.TraceTrufflePerformanceWarnings=true"
 )
 
 // To apply javaOptions

@@ -23,3 +23,9 @@ project/plugins/project/
 # Idea
 .idea
 *.iml
+
+# Gradle
+/build
+.gradle
+/gradle
+gradlew*

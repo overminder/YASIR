@@ -2,6 +2,7 @@ package com.github.overmind.yasir.ast;
 
 import com.github.overmind.yasir.Yasir;
 import com.github.overmind.yasir.value.Lambda;
+import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.RootCallTarget;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameSlot;
@@ -10,26 +11,30 @@ import com.oracle.truffle.api.nodes.ExplodeLoop;
 
 final public class MkLambda {
     public static Expr create(String name, FrameSlot[] argNames, Expr body, FrameDescriptor fd) {
-        return new Simple(name, fd, body, argNames);
+        return new Info(name, fd, body, argNames);
     }
 
-    static class Simple extends FramelessExpr {
-        private final String name;
+    public static class Info extends Expr {
+        public final String name;
 
-        @Child
-        protected BodyWrapper bodyWrapper;
+        @Child protected BodyWrapper bodyWrapper;
 
-        private final RootCallTarget target;
+        public final RootCallTarget target;
 
-        public Simple(String name, FrameDescriptor fd, Expr body, FrameSlot[] argNames) {
+        public Info(String name, FrameDescriptor fd, Expr body, FrameSlot[] argNames) {
             this.name = name;
-            this.bodyWrapper = new BodyWrapper(fd, body, argNames);
-            target = Yasir.rt().createCallTarget(bodyWrapper);
+            bodyWrapper = new BodyWrapper(body, argNames);
+            target = Yasir.rt().createCallTarget(RootEntry.create(bodyWrapper, fd));
         }
 
         @Override
-        public Object execute(VirtualFrame frame) {
-            return new Lambda(target, frame.materialize());
+        public String toString() {
+            return "#<MkLambda " + name + ">";
+        }
+
+        @Override
+        public Object executeGeneric(VirtualFrame frame) {
+            return new Lambda(this, frame.materialize());
         }
     }
 
@@ -39,21 +44,21 @@ final public class MkLambda {
 
         private final FrameSlot[] argNames;
 
-        protected BodyWrapper(FrameDescriptor fd, Expr body, FrameSlot[] argNames) {
-            super(fd);
-
+        protected BodyWrapper(Expr body, FrameSlot[] argNames) {
             this.body = body;
             this.argNames = argNames;
         }
 
         @Override
         @ExplodeLoop
-        public Object execute(VirtualFrame frame) {
+        public Object executeGeneric(VirtualFrame frame) {
+            CompilerAsserts.compilationConstant(argNames.length);
+
             Object[] args = frame.getArguments();
             for (int i = 0; i < argNames.length; ++i) {
                 frame.setObject(argNames[i], args[i + 1]);
             }
-            return body.execute(frame);
+            return body.executeGeneric(frame);
         }
     }
 }

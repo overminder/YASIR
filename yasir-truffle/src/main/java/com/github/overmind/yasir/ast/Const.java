@@ -11,7 +11,7 @@ public final class Const {
         return new ConstObject(o);
     }
 
-    private static class ConstLong extends FramelessExpr {
+    private static class ConstLong extends Expr {
         private final long v;
 
         public ConstLong(long v) {
@@ -20,12 +20,12 @@ public final class Const {
         }
 
         @Override
-        public Object execute(VirtualFrame frame) {
+        public Object executeGeneric(VirtualFrame frame) {
             return v;
         }
     }
 
-    private static class ConstObject extends FramelessExpr {
+    private static class ConstObject extends Expr {
         private final Object o;
 
         public ConstObject(Object o) {
@@ -34,7 +34,7 @@ public final class Const {
         }
 
         @Override
-        public Object execute(VirtualFrame frame) {
+        public Object executeGeneric(VirtualFrame frame) {
             return o;
         }
     }

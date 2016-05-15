@@ -4,12 +4,12 @@ import com.github.overmind.yasir.interp.InterpException;
 import com.github.overmind.yasir.Yasir;
 import com.github.overmind.yasir.value.Callable;
 import com.oracle.truffle.api.CallTarget;
+import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.CompilerDirectives;
+import com.oracle.truffle.api.dsl.Cached;
+import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.frame.VirtualFrame;
-import com.oracle.truffle.api.nodes.DirectCallNode;
-import com.oracle.truffle.api.nodes.ExplodeLoop;
-import com.oracle.truffle.api.nodes.IndirectCallNode;
-import com.oracle.truffle.api.nodes.UnexpectedResultException;
+import com.oracle.truffle.api.nodes.*;
 
 final public class Apply {
     public static Expr create(Expr func, Expr... args) {
@@ -17,10 +17,36 @@ final public class Apply {
     }
 
     public static Expr create(Expr func, boolean tail, Expr... args) {
-        return new Uninitialized(func, args, tail);
+        return new ApplyNew(func, args, tail);
     }
 
-    static class Uninitialized extends FramelessExpr {
+    static class ApplyNew extends Expr {
+        @Child
+        protected Expr func;
+
+        @Children
+        protected final Expr[] args;
+
+        @Child
+        protected Dispatch dispatch = ApplyFactory.DispatchNodeGen.create();
+
+        private final boolean tail;
+
+        public ApplyNew(Expr func, Expr[] args, boolean tail) {
+            this.func = func;
+            this.args = args;
+            this.tail = tail;
+        }
+
+        @Override
+        public Object executeGeneric(VirtualFrame frame) {
+            Callable funcValue = evalFunc(func, frame);
+            Object[] argValues = evalArgs(funcValue.payload(), args, frame);
+            return dispatch.executeDispatch(frame, funcValue, argValues);
+        }
+    }
+
+    static class Indirect extends Expr {
         @Child
         protected Expr func;
 
@@ -32,6 +58,29 @@ final public class Apply {
 
         private final boolean tail;
 
+        public Indirect(Expr func, Expr[] args, boolean tail) {
+            this.func = func;
+            this.args = args;
+            this.tail = tail;
+        }
+
+        @Override
+        public Object executeGeneric(VirtualFrame frame) {
+            Callable funcValue = evalFunc(func, frame);
+            // System.out.println("apply: " + funcValue + ", parent = " + getParent());
+            return icallNode.call(frame, funcValue.target(), evalArgs(funcValue.payload(), args, frame));
+        }
+    }
+
+    static class Uninitialized extends Expr {
+        @Child
+        protected Expr func;
+
+        @Children
+        protected final Expr[] args;
+
+        private final boolean tail;
+
         public Uninitialized(Expr func, Expr[] args, boolean tail) {
             this.func = func;
             this.args = args;
@@ -39,21 +88,16 @@ final public class Apply {
         }
 
         @Override
-        public Object execute(VirtualFrame frame) {
-            if (getParent() != null) {
-                CompilerDirectives.transferToInterpreter();
-                Callable funcValue = evalFunc(func, frame);
-                Direct spec = new Direct(funcValue.target(), func, args, tail);
-                return replace(spec).execute(frame, funcValue);
-            } else {
-                Callable funcValue = evalFunc(func, frame);
-
-                return icallNode.call(frame, funcValue.target(), evalArgs(funcValue.payload(), args, frame));
-            }
+        public Object executeGeneric(VirtualFrame frame) {
+            CompilerDirectives.transferToInterpreter();
+            Callable funcValue = evalFunc(func, frame);
+            Direct spec = new Direct(funcValue.target(), func, args, tail);
+            // System.out.println("apply: " + funcValue + ", parent = " + getParent());
+            return replace(spec).execute(frame, funcValue);
         }
     }
 
-    static class Direct extends FramelessExpr {
+    static class Direct extends Expr {
         @Child
         protected Expr func;
 
@@ -75,7 +119,7 @@ final public class Apply {
         }
 
         @Override
-        public Object execute(VirtualFrame frame) {
+        public Object executeGeneric(VirtualFrame frame) {
             return execute(frame, evalFunc(func, frame));
         }
 
@@ -100,12 +144,37 @@ final public class Apply {
 
     @ExplodeLoop
     private static Object[] evalArgs(Object payload, Expr[] args, VirtualFrame frame) {
+        CompilerAsserts.compilationConstant(args.length);
+
         Object[] argValues = new Object[args.length + 1];
         argValues[0] = payload;
         for (int i = 0; i < args.length; ++i) {
-            argValues[i + 1] = args[i].execute(frame);
+            argValues[i + 1] = args[i].executeGeneric(frame);
         }
         return argValues;
+    }
+
+    abstract static class Dispatch extends Node {
+        protected static final int INLINE_CACHE_SIZE = 2;
+        public abstract Object executeDispatch(VirtualFrame frame, Callable funcValue, Object[] args);
+
+        @Specialization(limit = "INLINE_CACHE_SIZE",
+                guards = "funcValue == cached")
+        protected static Object doDirect(VirtualFrame frame,
+                                         Callable funcValue,
+                                         Object[] args, //
+                                         @Cached("funcValue") Callable cached, //
+                                         @Cached("create(cached.target())") DirectCallNode callNode) {
+            return callNode.call(frame, args);
+        }
+
+        @Specialization(contains = "doDirect")
+        protected static Object doIndirect(VirtualFrame frame,
+                                           Callable funcValue,
+                                           Object[] args, //
+                                           @Cached("create()") IndirectCallNode callNode) {
+            return callNode.call(frame, funcValue.target(), args);
+        }
     }
 }
 

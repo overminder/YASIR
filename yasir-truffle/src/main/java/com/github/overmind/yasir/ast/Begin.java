@@ -1,28 +1,31 @@
 package com.github.overmind.yasir.ast;
 
 import com.github.overmind.yasir.value.Symbol;
+import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 
 public final class Begin {
     public static Expr create(Expr... es) {
-        return new Simple(es);
+        return new BeginImpl(es);
     }
 
-    static class Simple extends FramelessExpr {
+    static class BeginImpl extends Expr {
         @Children
         protected final Expr[] es;
 
-        Simple(Expr[] es) {
+        BeginImpl(Expr[] es) {
             this.es = es;
         }
 
         @Override
         @ExplodeLoop
-        public Object execute(VirtualFrame frame) {
+        public Object executeGeneric(VirtualFrame frame) {
+            CompilerAsserts.compilationConstant(es.length);
+
             Object res = Symbol.apply("#void");
             for (Expr e : es)  {
-                res = e.execute(frame);
+                res = e.executeGeneric(frame);
             }
             return res;
         }

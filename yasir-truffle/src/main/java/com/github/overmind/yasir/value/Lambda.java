@@ -1,17 +1,22 @@
 package com.github.overmind.yasir.value;
 
+import com.github.overmind.yasir.ast.MkLambda;
 import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.RootCallTarget;
 import com.oracle.truffle.api.frame.MaterializedFrame;
 
 public class Lambda extends Callable {
-    private final RootCallTarget target;
     private final MaterializedFrame frame;
+    private final MkLambda.Info info;
 
-    public Lambda(RootCallTarget target, MaterializedFrame frame) {
-        this.target = target;
-
+    public Lambda(MkLambda.Info info, MaterializedFrame frame) {
+        this.info = info;
         this.frame = frame;
+    }
+
+    @Override
+    public String toString() {
+        return "#<Lambda " + info.name + ">";
     }
 
     @Override
@@ -21,6 +26,6 @@ public class Lambda extends Callable {
 
     @Override
     public CallTarget target() {
-        return target;
+        return info.target;
     }
 }

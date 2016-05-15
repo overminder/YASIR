@@ -23,7 +23,8 @@ public class Simple {
         Expr main = MkLambda.create("main", new FrameSlot[]{},
                 Begin.create(
                         Vars.write(fiboBody, fiboSlot),
-                        Apply.create(Vars.read(fiboSlot), Const.create(n))),
+                        Apply.create(Vars.read(fiboSlot), Const.create(n))
+                ),
                 mainFd);
 
         return Apply.create(main);

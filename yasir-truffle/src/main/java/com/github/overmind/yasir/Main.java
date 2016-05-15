@@ -1,6 +1,5 @@
 package com.github.overmind.yasir;
 
-import com.github.overmind.yasir.Simple;
 import com.github.overmind.yasir.ast.Expr;
 import com.github.overmind.yasir.interp.Interp;
 

@@ -1,9 +1,6 @@
 package com.github.overmind.yasir;
 
-import com.oracle.truffle.api.CallTarget;
-import com.oracle.truffle.api.Truffle;
-import com.oracle.truffle.api.TruffleLanguage;
-import com.oracle.truffle.api.TruffleRuntime;
+import com.oracle.truffle.api.*;
 import com.oracle.truffle.api.frame.Frame;
 import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.frame.VirtualFrame;
@@ -23,17 +20,14 @@ public class Yasir {
     }
 
     @ExplodeLoop
-    public static Frame atDepth(VirtualFrame frame, int depth) {
-        if (depth == 0) {
-            return frame;
-        }
-
+    public static MaterializedFrame atDepth(VirtualFrame frame, int depth) {
+        CompilerAsserts.compilationConstant(depth);
         Frame here = frame;
         while (depth > 0) {
-            here = (Frame) here.getArguments()[0];
+            here = (MaterializedFrame) here.getArguments()[0];
             --depth;
         }
-        return here;
+        return (MaterializedFrame) here;
     }
 
     static class YasirContext {

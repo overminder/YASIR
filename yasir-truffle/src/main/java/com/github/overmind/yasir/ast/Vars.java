@@ -13,10 +13,15 @@ public class Vars {
     }
 
     public static Expr write(Expr expr, FrameSlot slot, int depth) {
-        return new FramelessExpr() {
+        return new Expr() {
             @Override
-            public Object execute(VirtualFrame frame) {
-                Yasir.atDepth(frame, depth).setObject(slot, expr.execute(frame));
+            public Object executeGeneric(VirtualFrame frame) {
+                Object value = expr.executeGeneric(frame);
+                if (depth == 0) {
+                    frame.setObject(slot, value);
+                } else {
+                    Yasir.atDepth(frame, depth).setObject(slot, value);
+                }
                 return Symbol.apply("#void");
             }
         };
@@ -27,11 +32,15 @@ public class Vars {
     }
 
     public static Expr read(FrameSlot slot, int depth) {
-        return new FramelessExpr() {
+        return new Expr() {
             @Override
-            public Object execute(VirtualFrame frame) {
+            public Object executeGeneric(VirtualFrame frame) {
                 try {
-                    return Yasir.atDepth(frame, depth).getObject(slot);
+                    if (depth == 0) {
+                        return frame.getObject(slot);
+                    } else {
+                        return Yasir.atDepth(frame, depth).getObject(slot);
+                    }
                 } catch (FrameSlotTypeException e) {
                     throw InterpException.unexpected(e);
                 }

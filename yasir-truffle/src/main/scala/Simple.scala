@@ -2,8 +2,8 @@ import com.oracle.truffle.api.frame.FrameDescriptor
 
 object Example {
   def makeFibo(n: Int): Expr = {
-    val mainFd = new FrameDescriptor()
-    val fiboFd = new FrameDescriptor()
+    val mainFd = Rt.createEnvDescr()
+    val fiboFd = Rt.createEnvDescr()
     val fiboSlot = mainFd.addFrameSlot("fiboSlot")
     val nSlot = fiboFd.addFrameSlot("n")
 

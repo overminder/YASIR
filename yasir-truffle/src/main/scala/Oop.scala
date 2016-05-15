@@ -18,35 +18,35 @@ case object Symbol {
 }
 
 trait Callable {
-  def call(args: Array[AnyRef], frame: Frame, cont: Cont): CekState
+  def call(args: Array[AnyRef], env: Rt.Env, cont: Cont): CekState
 }
 
 case object PrimAdd extends Callable {
-  override def call(args: Array[AnyRef], frame: Frame, cont: Cont): CekState = {
+  override def call(args: Array[AnyRef], env: Rt.Env, cont: Cont): CekState = {
     val sum = args.map(_.asInstanceOf[Int]).sum
-    cont.plugReduce(Int.box(sum), frame)
+    cont.plugReduce(Int.box(sum), env)
   }
 }
 
 case object PrimSub extends Callable {
-  override def call(args: Array[AnyRef], frame: Frame, cont: Cont): CekState = {
+  override def call(args: Array[AnyRef], env: Rt.Env, cont: Cont): CekState = {
     args.map(_.asInstanceOf[Int]) match {
-      case Array(lhs, rhs) => cont.plugReduce(Int.box(lhs - rhs), frame)
+      case Array(lhs, rhs) => cont.plugReduce(Int.box(lhs - rhs), env)
     }
   }
 }
 
 case object PrimLessThan extends Callable {
-  override def call(args: Array[AnyRef], frame: Frame, cont: Cont): CekState = {
+  override def call(args: Array[AnyRef], env: Rt.Env, cont: Cont): CekState = {
     args.map(_.asInstanceOf[Int]) match {
-      case Array(lhs, rhs) => cont.plugReduce(Boolean.box(lhs < rhs), frame)
+      case Array(lhs, rhs) => cont.plugReduce(Boolean.box(lhs < rhs), env)
     }
   }
 }
 
-sealed case class Lambda(info: MkLambda, capturedFrame: MaterializedFrame) extends Callable {
-  override def call(args: Array[AnyRef], frame: Frame, cont: Cont): CekState = {
-    info.enterWithArgs(capturedFrame, args, cont)
+sealed case class Lambda(info: MkLambda, capturedEnv: Rt.Env) extends Callable {
+  override def call(args: Array[AnyRef], env: Rt.Env, cont: Cont): CekState = {
+    info.enterWithArgs(capturedEnv, args, cont)
   }
 }
 

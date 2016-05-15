@@ -1,7 +1,7 @@
 
 object Main {
   def main(args: Array[String]): Unit = {
-    val n = 25
+    val n = 20
     val fiboN = Example.makeFibo(n)
     for (i <- 1 to 5) {
       bench(s"fibo($n)", () => {

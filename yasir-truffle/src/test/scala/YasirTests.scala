@@ -14,7 +14,7 @@ class ExprSpec extends FlatSpec with Matchers {
   }
 
   "Simple lambda" should "work" in {
-    val frameDescr = new FrameDescriptor()
+    val frameDescr = Rt.createEnvDescr()
     val x = frameDescr.addFrameSlot("x")
     val id = MkLambda("id", Array(x), ReadVar(x), frameDescr)
     val expr = Apply(id, Array(ConstInt(42)))
@@ -22,8 +22,8 @@ class ExprSpec extends FlatSpec with Matchers {
   }
 
   "Lexical scope" should "work" in {
-    val outer = new FrameDescriptor()
-    val inner = new FrameDescriptor()
+    val outer = Rt.createEnvDescr()
+    val inner = Rt.createEnvDescr()
     val x = outer.addFrameSlot("x")
     val y = inner.addFrameSlot("y")
     val k = MkLambda("const", Array(x), MkLambda("const-inner", Array(y), ReadVar(x, 1), inner), outer)
@@ -32,7 +32,7 @@ class ExprSpec extends FlatSpec with Matchers {
   }
 
   "WriteVar" should "work" in {
-    val fd = new FrameDescriptor()
+    val fd = Rt.createEnvDescr()
     val x = fd.addFrameSlot("x")
     val fn = MkLambda("set-42", Array(x), Begin(Array(WriteVar(ConstInt(42), x), ReadVar(x))), fd)
     val expr = Apply(fn, Array(ConstInt(0)))

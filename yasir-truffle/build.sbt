@@ -5,3 +5,12 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.2.6" % "test"
 )
 
+javaOptions ++= Seq(
+  "-XX:+UnlockDiagnosticVMOptions",
+  "-G:+TraceTruffleCompilation",
+  "-G:+TraceTruffleInlining",
+  "-G:+TraceTruffleTransferToInterpreter"
+)
+
+// To apply javaOptions
+fork := true

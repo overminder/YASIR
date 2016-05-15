@@ -7,12 +7,12 @@ import scala.collection.mutable
   * Created by overmind on 5/15/16.
   */
 
-object TruffleRt {
+object Rt {
   import com.oracle.truffle.api.frame._
 
   type Env = Frame
   type Slot = FrameSlot
-  type Descr = FrameDescriptor
+  type EnvDescr = FrameDescriptor
 
   def atDepth(frame: Env, depth: Int): Env = {
     var here = frame
@@ -23,9 +23,19 @@ object TruffleRt {
     }
     here
   }
+
+  val emptyEnv: Env = Truffle.getRuntime().createVirtualFrame(Array(), createEnvDescr())
+
+  def createEnv(args: Array[AnyRef], prev: Env, descr: EnvDescr): Env = {
+    Truffle.getRuntime().createVirtualFrame(prev +: args, descr)
+  }
+
+  def createEnvDescr(): EnvDescr = new FrameDescriptor()
+
+  def createCallTarget(node: RootNode): CallTarget = Truffle.getRuntime().createCallTarget(node)
 }
 
-object Rt {
+object SimpleRt {
   type Slot = Int
   sealed case class EnvDescr() {
     private var nextIx = 0
@@ -79,6 +89,5 @@ object Rt {
   def createEnvDescr(): EnvDescr = EnvDescr()
 
   def createCallTarget(node: RootNode): CallTarget = Truffle.getRuntime().createCallTarget(node)
-
 }
 

@@ -1,3 +1,5 @@
+scalaVersion := "2.10.6"
+
 libraryDependencies ++= Seq(
   "com.oracle.truffle" % "truffle-api" % "0.13",
   "com.oracle.truffle" % "truffle-dsl-processor" % "0.13",
@@ -5,12 +7,25 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.2.6" % "test"
 )
 
+import java.util.Properties
+
+val localProperties = settingKey[Properties]("The application properties")
+
+localProperties := {
+  val prop = new Properties()
+  IO.load(prop, new File("local.properties"))
+  prop
+}
+
+javaOptions += localProperties.value.getProperty("bootcpOpt")
+
 javaOptions ++= Seq(
-  "-XX:+UnlockDiagnosticVMOptions",
-  "-G:+TraceTruffleCompilation",
-  "-G:+TraceTruffleInlining",
-  "-G:+TraceTruffleTransferToInterpreter"
+  // These used to be '-G:+${NAME}' (and require -XX:+UnlockDiagnosticVMOptions)
+  // rather than '-Dgraal.${NAME}=true'...
+  "-Dgraal.TraceTruffleCompilationDetails=true",
+  "-Dgraal.TraceTruffleInlining=true",
+  "-Dgraal.TraceTruffleTransferToInterpreter=true"
 )
 
 // To apply javaOptions
-fork := true
+fork in run := true

@@ -1,5 +1,13 @@
 
 object Main {
+  def printVmArgs(): Unit = {
+    import java.lang.management.ManagementFactory
+    import scala.collection.JavaConversions._
+
+    val args = ManagementFactory.getRuntimeMXBean.getInputArguments
+    println(s"VMArgs: ${args.toList.mkString(" ")}")
+  }
+
   def main(args: Array[String]): Unit = {
     val n = 20
     val fiboN = Example.makeFibo(n)

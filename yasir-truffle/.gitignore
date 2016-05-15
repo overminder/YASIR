@@ -2,6 +2,9 @@
 *.log
 .*.swp
 
+# Truffle bootcp
+local.properties
+
 # sbt specific
 .cache
 .history

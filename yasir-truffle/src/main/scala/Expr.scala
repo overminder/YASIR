@@ -1,8 +1,8 @@
 import com.oracle.truffle.api.{RootCallTarget, Truffle}
 import com.oracle.truffle.api.frame._
-import com.oracle.truffle.api.nodes.{Node, RootNode}
+import com.oracle.truffle.api.nodes.{Node, RepeatingNode, RootNode}
 
-abstract class Expr() extends RootNode(classOf[YasirLanguage], null, null) {
+abstract class Expr extends RootNode(classOf[YasirLanguage], null, null) {
   def evaluate(env: Rt.Env, cont: Cont): CekState
 
   override def execute(frame: VirtualFrame): AnyRef = {
@@ -11,6 +11,7 @@ abstract class Expr() extends RootNode(classOf[YasirLanguage], null, null) {
     throw TrampolineException(evaluate(env, cont))
   }
 }
+
 
 sealed case class ConstInt(v: Int) extends Expr {
   def evaluate(env: Rt.Env, cont: Cont): CekState = {

@@ -1,6 +1,6 @@
 import com.oracle.truffle.api.TruffleLanguage.Env
 import com.oracle.truffle.api.frame.{Frame, FrameDescriptor, MaterializedFrame, VirtualFrame}
-import com.oracle.truffle.api.nodes.{Node, RootNode}
+import com.oracle.truffle.api.nodes.{Node, RepeatingNode, RootNode}
 import com.oracle.truffle.api.source.Source
 import com.oracle.truffle.api.{CallTarget, Truffle, TruffleLanguage}
 

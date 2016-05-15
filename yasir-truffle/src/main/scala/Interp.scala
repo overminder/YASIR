@@ -1,4 +1,3 @@
-import Halt.HaltException
 import com.oracle.truffle.api.TruffleLanguage.Env
 import com.oracle.truffle.api.frame.{Frame, FrameDescriptor, MaterializedFrame, VirtualFrame}
 import com.oracle.truffle.api.nodes.{Node, RootNode}
@@ -24,14 +23,28 @@ case class YasirLanguage() extends TruffleLanguage[YasirContext] {
 }
 
 object Interp {
-  sealed case class Run(expr: Expr) extends RootNode(classOf[YasirLanguage], null, null) {
-    override def execute(frame: VirtualFrame): AnyRef = {
-      runInternal(expr)
-    }
-  }
-
   def run(expr: Expr): AnyRef = {
-    Truffle.getRuntime().createCallTarget(Run(expr)).call()
+    var target: CallTarget = Truffle.getRuntime().createCallTarget(expr)
+    var frame: Frame = null
+    var cont: Cont = Halt
+    while (true) {
+      try {
+        target.call(frame, cont)
+      } catch {
+        case HaltException(value) => return value
+        case TrampolineException(state) => state match {
+          case CekState.ReuseFrame(target1, cont1) => {
+            target = target1
+            cont = cont1
+          }
+          case CekState.ChangeFrame(target1, frame1, cont1) => {
+            target = target1
+            frame = frame1
+            cont = cont1
+          }
+        }
+      }
+    }
   }
 
   private def runInternal(expr0: Expr): AnyRef = {
@@ -56,12 +69,17 @@ object Interp {
 }
 
 
-sealed case class CekState(expr: Expr, env: Frame, cont: Cont)
+sealed trait CekState
+object CekState {
+  sealed case class ReuseFrame(expr: CallTarget, cont: Cont) extends CekState
+  sealed case class ChangeFrame(expr: CallTarget, frame: Frame, cont: Cont) extends CekState
+}
 
 case object Halt extends Cont {
   def plugReduce(value: AnyRef, frame: Frame): CekState = {
     throw new HaltException(value)
   }
-
-  case class HaltException(value: AnyRef) extends RuntimeException
 }
+
+case class HaltException(value: AnyRef) extends Exception
+case class TrampolineException(newState: CekState) extends Exception

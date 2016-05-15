@@ -1,10 +1,14 @@
 import Begin.BeginCont
 import com.oracle.truffle.api.{RootCallTarget, Truffle}
-import com.oracle.truffle.api.frame.{Frame, FrameDescriptor, FrameSlot, MaterializedFrame}
-import com.oracle.truffle.api.nodes.Node
+import com.oracle.truffle.api.frame._
+import com.oracle.truffle.api.nodes.{Node, RootNode}
 
-trait Expr extends Node {
-  def evaluate(frame: Frame, cont: Cont): CekState
+abstract class Expr(frameDescr: FrameDescriptor = null) extends RootNode(classOf[YasirLanguage], null, frameDescr) {
+  abstract def evaluate(frame: Frame, cont: Cont): CekState
+  sealed override def execute(frame: VirtualFrame): AnyRef = {
+    val cont = frame.getArguments()(1).asInstanceOf[Cont]
+    throw TrampolineException(evaluate(frame, cont))
+  }
 }
 
 sealed case class ConstInt(v: Int) extends Expr {

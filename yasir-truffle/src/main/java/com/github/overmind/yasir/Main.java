@@ -16,22 +16,12 @@ public class Main {
         System.out.println();
     }
 
-    public static void main(String[] args) {
-        int n = Integer.parseInt(args[0]);
+    static void benchFibo(int n) {
         Expr fiboN = Simple.makeFibo(n);
-        for (int i = 0; i < 5; ++i) {
-            bench("fibo " + n, () -> {
-                Object res = Interp.run(fiboN);
-                System.out.println("res = " + res);
-            });
-        }
+        Interp.bench("fibo " + n, fiboN, 10);
     }
 
-    // Explicit thunk since explicit is better than implicit.
-    static void bench(String name, Runnable thunk) {
-        long t0 = System.nanoTime();
-        thunk.run();
-        long t1 = System.nanoTime();
-        System.out.printf("%s took %s millis\n", name, (t1 - t0) / 1000000.0);
+    public static void main(String[] args) {
+        benchFibo(30);
     }
 }

@@ -1,56 +1,42 @@
 package com.github.overmind.yasir.ast;
 
-import com.github.overmind.yasir.interp.InterpException;
-import com.oracle.truffle.api.frame.VirtualFrame;
-import com.oracle.truffle.api.nodes.UnexpectedResultException;
+import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.nodes.NodeInfo;
 
 final public class PrimOps {
     public static Expr add(Expr lhs, Expr rhs) {
-        return createBinary((x, y) -> x + y, lhs, rhs);
+        return PrimOpsFactory.AddNodeGen.create(lhs, rhs);
     }
 
     public static Expr sub(Expr lhs, Expr rhs) {
-        return createBinary((x, y) -> x - y, lhs, rhs);
+        return PrimOpsFactory.SubNodeGen.create(lhs, rhs);
     }
 
     public static Expr lessThan(Expr lhs, Expr rhs) {
-        return createBinary((x, y) -> x < y, lhs, rhs);
+        return PrimOpsFactory.LessThanNodeGen.create(lhs, rhs);
     }
 
-    protected static Expr createBinary(BinaryArithOpImpl opImpl, Expr lhs, Expr rhs) {
-        return new BinaryLongExpr(lhs, rhs) {
-            @Override
-            Object doLong(long lhs, long rhs) {
-                return opImpl.doLong(lhs, rhs);
-            }
-        };
-    }
-
-    static abstract class BinaryLongExpr extends Expr {
-        @Child
-        protected Expr lhs;
-
-        @Child
-        protected Expr rhs;
-
-        BinaryLongExpr(Expr lhs, Expr rhs) {
-            this.lhs = lhs;
-            this.rhs = rhs;
-        }
-
-        abstract Object doLong(long lhs, long rhs);
-
-        @Override
-        Object executeGeneric(VirtualFrame frame) {
-            try {
-                return doLong(lhs.executeLong(frame), rhs.executeLong(frame));
-            } catch (UnexpectedResultException e) {
-                throw InterpException.unexpected(e);
-            }
+    @NodeInfo(shortName = "+")
+    abstract static class Add extends Binary {
+        @Specialization(rewriteOn = ArithmeticException.class)
+        protected long add(long lhs, long rhs) {
+            return lhs + rhs;
         }
     }
 
-    interface BinaryArithOpImpl {
-        Object doLong(long lhs, long rhs);
+    @NodeInfo(shortName = "-")
+    abstract static class Sub extends Binary {
+        @Specialization(rewriteOn = ArithmeticException.class)
+        protected long sub(long lhs, long rhs) {
+            return lhs - rhs;
+        }
+    }
+
+    @NodeInfo(shortName = "<")
+    abstract static class LessThan extends Binary {
+        @Specialization(rewriteOn = ArithmeticException.class)
+        protected boolean lessThan(long lhs, long rhs) {
+            return lhs < rhs;
+        }
     }
 }

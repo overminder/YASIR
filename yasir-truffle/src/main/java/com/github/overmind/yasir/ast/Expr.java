@@ -12,7 +12,7 @@ import com.oracle.truffle.api.nodes.UnexpectedResultException;
 
 @TypeSystemReference(YasirTypes.class)
 public abstract class Expr extends Node {
-    abstract Object executeGeneric(VirtualFrame frame);
+    public abstract Object executeGeneric(VirtualFrame frame);
 
     public long executeLong(VirtualFrame frame) throws UnexpectedResultException {
         return YasirTypesGen.expectLong(executeGeneric(frame));

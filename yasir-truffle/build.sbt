@@ -26,11 +26,13 @@ javaOptions += localProperties.value.getProperty("bootcpOpt")
 javaOptions ++= Seq(
   // These used to be '-G:+${NAME}' (and require -XX:+UnlockDiagnosticVMOptions)
   // rather than '-Dgraal.${NAME}=true'...
-  "-Dgraal.TraceTruffleCompilationDetails=true",
-  "-Dgraal.TraceTruffleInlining=true",
-  "-Dgraal.TraceTruffleTransferToInterpreter=true",
+  // "-Dgraal.TraceTruffleCompilationDetails=true",
+  // "-Dgraal.TraceTruffleInlining=true",
+  // "-Dgraal.TraceTruffleTransferToInterpreter=true",
   "-Dgraal.TraceTrufflePerformanceWarnings=true"
 )
 
 // To apply javaOptions
 fork in run := true
+
+mainClass in (Compile, run) := Some("com.github.overmind.yasir.Main")

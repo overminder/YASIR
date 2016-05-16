@@ -2,19 +2,19 @@ package com.github.overmind.yasir.ast;
 
 import com.oracle.truffle.api.frame.VirtualFrame;
 
-public final class Const {
+public final class Lit {
     public static Expr create(long v) {
-        return new ConstLong(v);
+        return new LitLong(v);
     }
 
     public static Expr create(Object o) {
-        return new ConstObject(o);
+        return new LitObject(o);
     }
 
-    private static class ConstLong extends Expr {
+    private static class LitLong extends Expr {
         private final long v;
 
-        public ConstLong(long v) {
+        public LitLong(long v) {
             super();
             this.v = v;
         }
@@ -25,10 +25,10 @@ public final class Const {
         }
     }
 
-    private static class ConstObject extends Expr {
+    private static class LitObject extends Expr {
         private final Object o;
 
-        public ConstObject(Object o) {
+        public LitObject(Object o) {
             super();
             this.o = o;
         }

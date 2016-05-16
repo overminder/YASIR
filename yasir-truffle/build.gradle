@@ -1,12 +1,10 @@
+plugins {
+    id "net.ltgt.apt" version "0.6"
+}
+
 apply plugin: 'idea'
 apply plugin: 'java'
 apply plugin: 'application'
-
-idea {
-    module {
-        generatedSourceDirs += file('build/classes/main')
-    }
-}
 
 repositories {
     mavenCentral()
@@ -25,6 +23,6 @@ mainClassName = 'com.github.overmind.yasir.Main'
 
 dependencies {
     compile "com.oracle.truffle:truffle-api:0.13"
-    compile "com.oracle.truffle:truffle-dsl-processor:0.13"
+    apt "com.oracle.truffle:truffle-dsl-processor:0.13"
     testCompile "junit:junit:4.12"
 }

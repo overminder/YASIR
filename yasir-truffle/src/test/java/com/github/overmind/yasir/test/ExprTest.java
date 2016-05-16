@@ -3,10 +3,12 @@ package com.github.overmind.yasir.test;
 import com.github.overmind.yasir.Simple;
 import com.github.overmind.yasir.ast.*;
 import com.github.overmind.yasir.interp.Interp;
+import com.github.overmind.yasir.value.Box;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameSlot;
 import org.junit.Test;
 
+import static com.github.overmind.yasir.Simple.array;
 import static org.junit.Assert.assertEquals;
 
 public class ExprTest {
@@ -14,19 +16,18 @@ public class ExprTest {
         assertEquals(Interp.run(expr), res);
     }
 
-    @SafeVarargs
-    private final <A> A[] array(A... args) {
-        return args;
+    private void assertEvaluatesToBoxed(Expr expr, Object res) {
+        assertEquals(((Box) Interp.run(expr)).value(), res);
     }
 
     @Test
     public void testConst() {
-        assertEvaluatesTo(Const.create(42), 42L);
+        assertEvaluatesTo(Lit.create(42), 42L);
     }
 
     @Test
     public void testAdd() {
-        Expr expr = PrimOps.add(Const.create(40), Const.create(2));
+        Expr expr = PrimOps.add(Lit.create(40), Lit.create(2));
         assertEvaluatesTo(expr, 42L);
     }
 
@@ -34,8 +35,8 @@ public class ExprTest {
     public void testLambda() {
         FrameDescriptor frameDescr = new FrameDescriptor();
         FrameSlot x = frameDescr.addFrameSlot("x");
-        Expr id = MkLambda.create("id", array(x), Vars.read(x), frameDescr);
-        Expr expr = Apply.create(id, Const.create(42));
+        Expr id = MkLambda.create("id", array(x), array(), Vars.read(x), frameDescr);
+        Expr expr = Apply.create(id, Lit.create(42));
         assertEvaluatesTo(expr, 42L);
     }
 
@@ -45,9 +46,9 @@ public class ExprTest {
         FrameDescriptor inner = new FrameDescriptor();
         FrameSlot x = outer.addFrameSlot("x");
         FrameSlot y = inner.addFrameSlot("y");
-        Expr k = MkLambda.create("const", array(x),
-                MkLambda.create("const-inner", array(y), Vars.read(x, 1), inner), outer);
-        Expr expr = Apply.create(Apply.create(k, Const.create(42)), Const.create(0));
+        Expr k = MkLambda.create("const", array(x), array(),
+                MkLambda.create("const-inner", array(y), array(), Vars.read(x, 1), inner), outer);
+        Expr expr = Apply.create(Apply.create(k, Lit.create(42)), Lit.create(0));
         assertEvaluatesTo(expr, 42L);
     }
 
@@ -55,10 +56,10 @@ public class ExprTest {
     public void testVarsWrite() {
         FrameDescriptor fd = new FrameDescriptor();
         FrameSlot x = fd.addFrameSlot("x");
-        Expr fn = MkLambda.create("set-42", array(x),
-                Begin.create(Vars.write(Const.create(42), x), Vars.read(x)), fd);
-        Expr expr = Apply.create(fn, Const.create(0));
-        assertEvaluatesTo(expr, 42L);
+        Expr fn = MkLambda.create("set-42", array(x), array(),
+                Begin.create(Vars.write(Lit.create(42), x), Vars.read(x)), fd);
+        Expr expr = Apply.create(fn, Lit.create(Box.create()));
+        assertEvaluatesToBoxed(expr, 42L);
     }
 
     @Test

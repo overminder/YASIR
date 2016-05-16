@@ -89,8 +89,8 @@ final public class Apply {
 
         @Override
         public Object executeGeneric(VirtualFrame frame) {
-            CompilerDirectives.transferToInterpreter();
             Callable funcValue = evalFunc(func, frame);
+            CompilerDirectives.transferToInterpreter();
             Direct spec = new Direct(funcValue.target(), func, args, tail);
             // System.out.println("apply: " + funcValue + ", parent = " + getParent());
             return replace(spec).execute(frame, funcValue);
@@ -126,7 +126,9 @@ final public class Apply {
         protected Object execute(VirtualFrame frame, Callable funcValue) {
             Object[] argValues = evalArgs(funcValue.payload(), args, frame);
             if (target.getCallTarget() != funcValue.target()) {
-                return icallNode.call(frame, funcValue.target(), argValues);
+                CompilerDirectives.transferToInterpreterAndInvalidate();
+                throw InterpException.unexpected("Call not constant");
+                // return icallNode.call(frame, funcValue.target(), argValues);
             } else {
                 return target.call(frame, argValues);
             }

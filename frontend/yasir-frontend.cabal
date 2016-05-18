@@ -18,8 +18,21 @@ cabal-version:       >=1.10
 executable yasir-frontend
   main-is:             Main.hs
   other-modules:       Expr
+                     , Parser
+  default-extensions:  ScopedTypeVariables
+                     , PatternSynonyms
+                     , TypeSynonymInstances
+                     , FlexibleContexts
+                     , FlexibleInstances
+                     , LambdaCase
+                     , DeriveFoldable
+                     , DeriveFunctor
+                     , DeriveTraversable
+
   -- other-extensions:    
   build-depends:       base >=4.8 && <4.9
                      , parsec
+                     , recursion-schemes
+                     , ansi-wl-pprint
   -- hs-source-dirs:      
   default-language:    Haskell2010

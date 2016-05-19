@@ -19,13 +19,20 @@ parseExpr source = case parse pExpr "Expr" source of
 pName :: Parser Name
 pName = ident <?> "identifier"
 
+pNameOrSetVar :: Parser Expr
+pNameOrSetVar = do
+  n <- pName
+  pSetVar n <|> pure (Var n)
+  where
+    pSetVar n = SetVar n <$> (reservedOp ":=" *> pExpr)
+
 pLit :: Parser Expr
 pLit = Lit . fromInteger <$> integer <?> "int-literal"
 
 pTerm :: Parser Expr
 pTerm = buildExpressionParser table term <?> "compound-term"
   where
-    term = parens pExpr <|> pLit <|> (Var <$> pName) <?> "term"
+    term = parens pExpr <|> pLit <|> pNameOrSetVar <?> "term"
     table = [ [Postfix funcall]
             , [binary "+" Add AssocLeft, binary "-" Sub AssocLeft]
             , [binary "<" LessThan AssocLeft]
@@ -58,7 +65,7 @@ pExpr = pIf <|> pLet <|> pSeq <|> pLambda <|> pTerm <?> "expr"
 
 lexer :: P.GenTokenParser String u Identity
 lexer = P.makeTokenParser (javaStyle { P.reservedNames = words "if then else let in"
-                                     , P.reservedOpNames = words "+ - < = \\ ->"
+                                     , P.reservedOpNames = words "+ - < = \\ -> :="
                                      })
 
 parens :: forall u a. ParsecT String u Identity a -> ParsecT String u Identity a

@@ -1,7 +1,7 @@
 package com.github.overmind.yasir.ast;
 
 import com.github.overmind.yasir.YasirTypes;
-import com.github.overmind.yasir.value.Callable;
+import com.github.overmind.yasir.value.Closure;
 import com.github.overmind.yasir.value.Symbol;
 import com.oracle.truffle.api.dsl.TypeSystemReference;
 import com.oracle.truffle.api.frame.VirtualFrame;
@@ -22,8 +22,8 @@ public abstract class Expr extends Node {
         return YasirTypesGen.expectBoolean(executeGeneric(frame));
     }
 
-    public Callable executeCallable(VirtualFrame frame) throws UnexpectedResultException {
-        return YasirTypesGen.expectCallable(executeGeneric(frame));
+    public Closure executeClosure(VirtualFrame frame) throws UnexpectedResultException {
+        return YasirTypesGen.expectClosure(executeGeneric(frame));
     }
 
     public Symbol executeSymbol(VirtualFrame frame) throws UnexpectedResultException {

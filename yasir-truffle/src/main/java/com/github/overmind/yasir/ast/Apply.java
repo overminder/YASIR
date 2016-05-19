@@ -2,7 +2,7 @@ package com.github.overmind.yasir.ast;
 
 import com.github.overmind.yasir.interp.InterpException;
 import com.github.overmind.yasir.Yasir;
-import com.github.overmind.yasir.value.Callable;
+import com.github.overmind.yasir.value.Closure;
 import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.CompilerDirectives;
@@ -40,7 +40,7 @@ final public class Apply {
 
         @Override
         public Object executeGeneric(VirtualFrame frame) {
-            Callable funcValue = evalFunc(func, frame);
+            Closure funcValue = evalFunc(func, frame);
             Object[] argValues = evalArgs(funcValue.payload(), args, frame);
             return dispatch.executeDispatch(frame, funcValue, argValues);
         }
@@ -66,7 +66,7 @@ final public class Apply {
 
         @Override
         public Object executeGeneric(VirtualFrame frame) {
-            Callable funcValue = evalFunc(func, frame);
+            Closure funcValue = evalFunc(func, frame);
             // System.out.println("apply: " + funcValue + ", parent = " + getParent());
             return icallNode.call(frame, funcValue.target(), evalArgs(funcValue.payload(), args, frame));
         }
@@ -89,7 +89,7 @@ final public class Apply {
 
         @Override
         public Object executeGeneric(VirtualFrame frame) {
-            Callable funcValue = evalFunc(func, frame);
+            Closure funcValue = evalFunc(func, frame);
             CompilerDirectives.transferToInterpreter();
             Direct spec = new Direct(funcValue.target(), func, args, tail);
             // System.out.println("apply: " + funcValue + ", parent = " + getParent());
@@ -123,7 +123,7 @@ final public class Apply {
             return execute(frame, evalFunc(func, frame));
         }
 
-        protected Object execute(VirtualFrame frame, Callable funcValue) {
+        protected Object execute(VirtualFrame frame, Closure funcValue) {
             Object[] argValues = evalArgs(funcValue.payload(), args, frame);
             if (target.getCallTarget() != funcValue.target()) {
                 CompilerDirectives.transferToInterpreterAndInvalidate();
@@ -135,9 +135,9 @@ final public class Apply {
         }
     }
 
-    private static Callable evalFunc(Expr func, VirtualFrame frame) {
+    private static Closure evalFunc(Expr func, VirtualFrame frame) {
         try {
-            return func.executeCallable(frame);
+            return func.executeClosure(frame);
         } catch (UnexpectedResultException e) {
             throw InterpException.unexpected(e);
         }
@@ -158,21 +158,21 @@ final public class Apply {
 
     abstract static class Dispatch extends Node {
         protected static final int INLINE_CACHE_SIZE = 2;
-        public abstract Object executeDispatch(VirtualFrame frame, Callable funcValue, Object[] args);
+        public abstract Object executeDispatch(VirtualFrame frame, Closure funcValue, Object[] args);
 
         @Specialization(limit = "INLINE_CACHE_SIZE",
                 guards = "funcValue == cached")
         protected static Object doDirect(VirtualFrame frame,
-                                         Callable funcValue,
+                                         Closure funcValue,
                                          Object[] args, //
-                                         @Cached("funcValue") Callable cached, //
+                                         @Cached("funcValue") Closure cached, //
                                          @Cached("create(cached.target())") DirectCallNode callNode) {
             return callNode.call(frame, args);
         }
 
         @Specialization(contains = "doDirect")
         protected static Object doIndirect(VirtualFrame frame,
-                                           Callable funcValue,
+                                           Closure funcValue,
                                            Object[] args, //
                                            @Cached("create()") IndirectCallNode callNode) {
             return callNode.call(frame, funcValue.target(), args);

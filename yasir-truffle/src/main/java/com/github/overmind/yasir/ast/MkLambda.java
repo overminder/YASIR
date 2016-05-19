@@ -2,7 +2,7 @@ package com.github.overmind.yasir.ast;
 
 import com.github.overmind.yasir.Yasir;
 import com.github.overmind.yasir.value.Box;
-import com.github.overmind.yasir.value.Lambda;
+import com.github.overmind.yasir.value.Closure;
 import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.RootCallTarget;
 import com.oracle.truffle.api.frame.FrameDescriptor;
@@ -37,7 +37,7 @@ final public class MkLambda {
 
         @Override
         public Object executeGeneric(VirtualFrame frame) {
-            return new Lambda(this, frame.materialize());
+            return new Closure(this, frame.materialize());
         }
     }
 

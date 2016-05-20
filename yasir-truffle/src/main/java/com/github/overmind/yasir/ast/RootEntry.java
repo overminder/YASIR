@@ -14,7 +14,7 @@ public final class RootEntry {
         return new RootEntryImpl(fd, body);
     }
 
-    protected static class RootEntryImpl extends RootNode {
+    protected static final class RootEntryImpl extends RootNode {
         @Child
         protected Expr body;
 

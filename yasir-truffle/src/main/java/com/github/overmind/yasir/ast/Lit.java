@@ -11,7 +11,7 @@ public final class Lit {
         return new LitObject(o);
     }
 
-    private static class LitLong extends Expr {
+    private static final class LitLong extends Expr {
         private final long v;
 
         public LitLong(long v) {
@@ -25,7 +25,7 @@ public final class Lit {
         }
     }
 
-    private static class LitObject extends Expr {
+    private static final class LitObject extends Expr {
         private final Object o;
 
         public LitObject(Object o) {

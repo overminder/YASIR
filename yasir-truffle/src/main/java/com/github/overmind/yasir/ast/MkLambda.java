@@ -16,7 +16,7 @@ final public class MkLambda {
         return new Info(name, fd, body, argNames, localNames);
     }
 
-    public static class Info extends Expr {
+    public static final class Info extends Expr {
         public final String name;
 
         // @Child protected BodyWrapper bodyWrapper;
@@ -37,7 +37,7 @@ final public class MkLambda {
 
         @Override
         public Object executeGeneric(VirtualFrame frame) {
-            return new Closure(this, frame.materialize());
+            return new Closure(target, name);
         }
     }
 
@@ -69,7 +69,7 @@ final public class MkLambda {
 
             Object[] args = frame.getArguments();
             for (int i = 0; i < argNames.length; ++i) {
-                frame.setObject(argNames[i], args[i + 1]);
+                frame.setObject(argNames[i], args[i]);
             }
             for (int i = 0; i < localNames.length; ++i) {
                 frame.setObject(localNames[i], Box.create());

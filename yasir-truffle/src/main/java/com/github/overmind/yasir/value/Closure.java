@@ -4,25 +4,23 @@ import com.github.overmind.yasir.ast.MkLambda;
 import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.frame.MaterializedFrame;
 
-public class Closure {
-    private final MaterializedFrame frame;
-    private final MkLambda.Info info;
+import static java.awt.SystemColor.info;
 
-    public Closure(MkLambda.Info info, MaterializedFrame frame) {
-        this.info = info;
-        this.frame = frame;
+public final class Closure {
+    private final CallTarget target;
+    private final String name;
+
+    public Closure(CallTarget target, String name) {
+        this.target = target;
+        this.name = name;
     }
 
     @Override
     public String toString() {
-        return "#<Closure " + info.name + ">";
-    }
-
-    public Object payload() {
-        return frame;
+        return "#<Closure " + name + ">";
     }
 
     public CallTarget target() {
-        return info.target;
+        return target;
     }
 }

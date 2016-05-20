@@ -4,7 +4,7 @@ import com.oracle.truffle.api.Assumption;
 import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.utilities.CyclicAssumption;
 
-public class Box {
+public final class Box {
     public static Box create() {
         return create(null);
     }

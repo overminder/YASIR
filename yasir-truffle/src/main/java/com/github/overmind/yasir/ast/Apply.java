@@ -41,7 +41,7 @@ final public class Apply {
         @Override
         public Object executeGeneric(VirtualFrame frame) {
             Closure funcValue = evalFunc(func, frame);
-            Object[] argValues = evalArgs(funcValue.payload(), args, frame);
+            Object[] argValues = evalArgs(args, frame);
             return dispatch.executeDispatch(frame, funcValue, argValues);
         }
     }
@@ -68,7 +68,7 @@ final public class Apply {
         public Object executeGeneric(VirtualFrame frame) {
             Closure funcValue = evalFunc(func, frame);
             // System.out.println("apply: " + funcValue + ", parent = " + getParent());
-            return icallNode.call(frame, funcValue.target(), evalArgs(funcValue.payload(), args, frame));
+            return icallNode.call(frame, funcValue.target(), evalArgs(args, frame));
         }
     }
 
@@ -124,7 +124,7 @@ final public class Apply {
         }
 
         protected Object execute(VirtualFrame frame, Closure funcValue) {
-            Object[] argValues = evalArgs(funcValue.payload(), args, frame);
+            Object[] argValues = evalArgs(args, frame);
             if (target.getCallTarget() != funcValue.target()) {
                 CompilerDirectives.transferToInterpreterAndInvalidate();
                 throw InterpException.unexpected("Call not constant");
@@ -145,13 +145,12 @@ final public class Apply {
 
 
     @ExplodeLoop
-    private static Object[] evalArgs(Object payload, Expr[] args, VirtualFrame frame) {
+    private static Object[] evalArgs(Expr[] args, VirtualFrame frame) {
         CompilerAsserts.compilationConstant(args.length);
 
-        Object[] argValues = new Object[args.length + 1];
-        argValues[0] = payload;
+        Object[] argValues = new Object[args.length];
         for (int i = 0; i < args.length; ++i) {
-            argValues[i + 1] = args[i].executeGeneric(frame);
+            argValues[i] = args[i].executeGeneric(frame);
         }
         return argValues;
     }
@@ -161,7 +160,7 @@ final public class Apply {
         public abstract Object executeDispatch(VirtualFrame frame, Closure funcValue, Object[] args);
 
         @Specialization(limit = "INLINE_CACHE_SIZE",
-                guards = "funcValue == cached")
+                guards = "funcValue.target() == cached.target()")
         protected static Object doDirect(VirtualFrame frame,
                                          Closure funcValue,
                                          Object[] args, //

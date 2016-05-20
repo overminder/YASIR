@@ -10,7 +10,7 @@ public final class Begin {
         return new BeginImpl(es);
     }
 
-    static class BeginImpl extends Expr {
+    static final class BeginImpl extends Expr {
         @Children
         protected final Expr[] es;
 

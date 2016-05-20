@@ -1,6 +1,7 @@
 package com.github.overmind.yasir;
 
 import com.github.overmind.yasir.ast.Expr;
+import com.github.overmind.yasir.ast.RootEntry;
 import com.github.overmind.yasir.interp.Interp;
 
 import java.lang.management.ManagementFactory;
@@ -16,12 +17,12 @@ public class Main {
         System.out.println();
     }
 
-    static void benchFibo(int n) {
-        Expr fiboN = Simple.makeFibo(n);
-        Interp.bench("fibo " + n, fiboN, 10);
+    static void benchFibo(long n) {
+        Expr fiboN = Simple.makeFiboBench(1, n);
+        Yasir.rt().createCallTarget(RootEntry.create(fiboN)).call();
     }
 
     public static void main(String[] args) {
-        benchFibo(30);
+        benchFibo(40);
     }
 }

@@ -41,23 +41,14 @@ public class ExprTest {
     }
 
     @Test
-    public void testLexicalScope() {
-        FrameDescriptor outer = new FrameDescriptor();
-        FrameDescriptor inner = new FrameDescriptor();
-        FrameSlot x = outer.addFrameSlot("x");
-        FrameSlot y = inner.addFrameSlot("y");
-        Expr k = MkLambda.create("const", array(x), array(),
-                MkLambda.create("const-inner", array(y), array(), Vars.read(x, 1), inner), outer);
-        Expr expr = Apply.create(Apply.create(k, Lit.create(42)), Lit.create(0));
-        assertEvaluatesTo(expr, 42L);
-    }
-
-    @Test
     public void testVarsWrite() {
         FrameDescriptor fd = new FrameDescriptor();
         FrameSlot x = fd.addFrameSlot("x");
         Expr fn = MkLambda.create("set-42", array(x), array(),
-                Begin.create(Vars.write(Lit.create(42), x), Vars.read(x)), fd);
+                Begin.create(
+                        Vars.write(Lit.create(42), x),
+                        Vars.read(x)),
+                fd);
         Expr expr = Apply.create(fn, Lit.create(Box.create()));
         assertEvaluatesToBoxed(expr, 42L);
     }

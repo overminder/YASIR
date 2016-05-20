@@ -18,7 +18,7 @@ public class Main {
     }
 
     static void benchFibo(long n) {
-        Expr fiboN = Simple.makeFiboBench(1, n);
+        Expr fiboN = Simple.makeFiboBench(10, n);
         Yasir.rt().createCallTarget(RootEntry.create(fiboN)).call();
     }
 

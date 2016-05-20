@@ -1,4 +1,11 @@
+# Truffle
+igv-saves
+/*.cfg
+
+# Java
 *.class
+
+# Misc
 *.log
 .*.swp
 

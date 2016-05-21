@@ -1,6 +1,5 @@
-package com.github.overmind.yasir.lowerast;
+package com.github.overmind.yasir.ast;
 
-import com.github.overmind.yasir.ast.Expr;
 import com.github.overmind.yasir.value.Closure;
 import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.frame.VirtualFrame;
@@ -8,11 +7,11 @@ import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 
 public final class ApplyNode {
-    static Expr known(Closure func, Expr... args) {
+    public static Expr known(Closure func, Expr... args) {
         return new KnownApplyNode(func, args);
     }
 
-    static Expr unknown(Expr func, Expr... args) {
+    public static Expr unknown(Expr func, Expr... args) {
         return new UnknownApplyNode(func, args);
     }
 

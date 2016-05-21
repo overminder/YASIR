@@ -1,14 +1,9 @@
 package com.github.overmind.yasir.value;
 
-import com.github.overmind.yasir.Yasir;
-import com.github.overmind.yasir.ast.MkLambda;
 import com.oracle.truffle.api.Assumption;
 import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.RootCallTarget;
-import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.utilities.CyclicAssumption;
-
-import static java.awt.SystemColor.info;
 
 public final class Closure {
     private CallTarget target;
@@ -37,5 +32,9 @@ public final class Closure {
     public void setTarget(RootCallTarget target) {
         this.target = target;
         targetNotChanged.invalidate();
+    }
+
+    public String name() {
+        return name;
     }
 }

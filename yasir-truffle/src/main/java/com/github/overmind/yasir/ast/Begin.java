@@ -1,5 +1,6 @@
 package com.github.overmind.yasir.ast;
 
+import com.github.overmind.yasir.value.Nil;
 import com.github.overmind.yasir.value.Symbol;
 import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.frame.VirtualFrame;
@@ -23,7 +24,7 @@ public final class Begin {
         public Object executeGeneric(VirtualFrame frame) {
             CompilerAsserts.compilationConstant(es.length);
 
-            Object res = Symbol.apply("#void");
+            Object res = Nil.INSTANCE;
             for (Expr e : es)  {
                 res = e.executeGeneric(frame);
             }

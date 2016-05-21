@@ -2,7 +2,6 @@ package com.github.overmind.yasir;
 
 import com.github.overmind.yasir.ast.Expr;
 import com.github.overmind.yasir.ast.RootEntry;
-import com.github.overmind.yasir.interp.Interp;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 
 import java.lang.management.ManagementFactory;
@@ -19,7 +18,7 @@ public class Main {
     }
 
     static void benchFibo(long n) {
-        Expr fiboN = Simple.makeFiboBench(0 /* count */, n);
+        Expr fiboN = Simple.makeFiboBench(5 /* count */, n);
         Yasir.rt().createCallTarget(RootEntry.create(fiboN)).call();
     }
 

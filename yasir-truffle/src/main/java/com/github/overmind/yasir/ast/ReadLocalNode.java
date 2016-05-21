@@ -1,6 +1,5 @@
-package com.github.overmind.yasir.lowerast;
+package com.github.overmind.yasir.ast;
 
-import com.github.overmind.yasir.ast.Expr;
 import com.oracle.truffle.api.dsl.NodeField;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.frame.FrameSlot;

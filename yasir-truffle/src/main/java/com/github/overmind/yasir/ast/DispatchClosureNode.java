@@ -1,4 +1,4 @@
-package com.github.overmind.yasir.lowerast;
+package com.github.overmind.yasir.ast;
 
 import com.github.overmind.yasir.value.Closure;
 import com.oracle.truffle.api.dsl.Cached;
@@ -15,7 +15,7 @@ public abstract class DispatchClosureNode extends Node {
                                            Closure function,
                                            Object[] arguments);
 
-    @Specialization(limit = "INLINE_CACHE_SIZE", guards = "function == cachedFunction", assumptions = "cachedFunction.targetNotChanged()")
+    @Specialization(limit = "INLINE_CACHE_SIZE", guards = "function.target() == cachedFunction.target()", assumptions = "cachedFunction.targetNotChanged()")
     protected static Object doDirect(VirtualFrame frame, Closure function, Object[] arguments, //
                                      @Cached("function") Closure cachedFunction, //
                                      @Cached("create(cachedFunction.target())") DirectCallNode callNode) {
@@ -24,7 +24,7 @@ public abstract class DispatchClosureNode extends Node {
     }
 
     /**
-     * FullTruffle-path code for a call, used when the polymorphic inline cache exceeded its maximum size
+     * FullyTruffled-path code for a call, used when the polymorphic inline cache exceeded its maximum size
      * specified in <code>INLINE_CACHE_SIZE</code>. Such calls are not optimized any further, e.g.,
      * no method inlining is performed.
      */

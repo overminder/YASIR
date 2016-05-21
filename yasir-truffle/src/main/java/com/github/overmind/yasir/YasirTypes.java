@@ -6,6 +6,6 @@ import com.github.overmind.yasir.value.Nil;
 import com.github.overmind.yasir.value.Symbol;
 import com.oracle.truffle.api.dsl.TypeSystem;
 
-@TypeSystem(value = {long.class, boolean.class, Symbol.class, Closure.class, Box.class, Nil.class})
+@TypeSystem(value = {long.class, boolean.class, Symbol.class, Closure.class, Box.class, Nil.class, Object[].class})
 public abstract class YasirTypes {
 }

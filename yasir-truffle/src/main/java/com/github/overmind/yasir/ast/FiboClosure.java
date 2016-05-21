@@ -1,8 +1,6 @@
-package com.github.overmind.yasir.lowerast;
+package com.github.overmind.yasir.ast;
 
 import com.github.overmind.yasir.Yasir;
-import com.github.overmind.yasir.ast.Expr;
-import com.github.overmind.yasir.ast.RootEntry;
 import com.github.overmind.yasir.value.Closure;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameSlot;
@@ -16,11 +14,11 @@ public final class FiboClosure {
         return createPassFuncBoxed();
     }
 
-    public static Closure createSlow() {
+    public static Closure createFullyTruffled() {
         Closure fibo = new Closure(null, "fibo-closure");
         FrameDescriptor fd = new FrameDescriptor();
         FrameSlot n = fd.addFrameSlot("n", FrameSlotKind.Long);
-        RootNode root = RootEntry.create(new FullTruffle(n, fibo), fd);
+        RootNode root = RootEntry.create(new FullyTruffled(n, fibo), fd);
         fibo.setTarget(Yasir.rt().createCallTarget(root));
         return fibo;
     }
@@ -49,6 +47,36 @@ public final class FiboClosure {
         fibo.setTarget(Yasir.rt().createCallTarget(fiboRoot));
         fiboTrampo.setTarget(Yasir.rt().createCallTarget(fiboTrampoRoot));
         return fiboTrampo;
+    }
+
+    static class PassMoreFuncBoxed extends Expr {
+        @Child
+        private Expr body;
+
+        PassMoreFuncBoxed() {
+            Expr isBaseCase = PrimOp.callLt(readN(), PrimOp.lit(2));
+            Expr recurNode = PrimOp.callAdd(
+                    ApplyNode.unknown(readFiboUnbox(), PrimOp.callSub(readN(), PrimOp.lit(1)), readFibo()),
+                    ApplyNode.unknown(readFiboUnbox(), PrimOp.callSub(readN(), PrimOp.lit(2)), readFibo()));
+            body = new IfNode(isBaseCase, readN(), recurNode);
+        }
+
+        Expr readN() {
+            return ReadArgNodeGen.create(0);
+        }
+
+        Expr readFiboUnbox() {
+            return PrimOp.readBox(readFibo());
+        }
+
+        Expr readFibo() {
+            return ReadArgNodeGen.create(1);
+        }
+
+        @Override
+        public Object executeGeneric(VirtualFrame frame) {
+            return body.executeGeneric(frame);
+        }
     }
 
     // Passing the boxed function to the call site.
@@ -110,7 +138,7 @@ public final class FiboClosure {
     }
 
     // Full truffle node with fixed call site.
-    static class FullTruffle extends Expr {
+    static class FullyTruffled extends Expr {
         final FrameSlot n;
 
         @Child
@@ -119,7 +147,7 @@ public final class FiboClosure {
         @Child
         private Expr body;
 
-        FullTruffle(FrameSlot n, Closure fibo) {
+        FullyTruffled(FrameSlot n, Closure fibo) {
             this.n = n;
 
             populateFrame = WriteLocalNodeGen.create(readArg(), n);

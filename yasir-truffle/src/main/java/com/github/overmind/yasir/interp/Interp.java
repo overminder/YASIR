@@ -1,16 +1,9 @@
 package com.github.overmind.yasir.interp;
 
 import com.github.overmind.yasir.Yasir;
-import com.github.overmind.yasir.ast.Begin;
 import com.github.overmind.yasir.ast.Expr;
 import com.github.overmind.yasir.ast.RootEntry;
-import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.RootCallTarget;
-import com.oracle.truffle.api.frame.FrameDescriptor;
-import com.oracle.truffle.api.frame.VirtualFrame;
-import com.oracle.truffle.api.nodes.DirectCallNode;
-import com.oracle.truffle.api.nodes.Node;
-import com.oracle.truffle.api.nodes.RootNode;
 
 import java.util.stream.IntStream;
 

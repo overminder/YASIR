@@ -30,7 +30,7 @@ javaOptions ++= Seq(
   // "-Dgraal.TraceTruffleInlining=true",
   // "-Dgraal.TraceTruffleTransferToInterpreter=true",
   "-Dgraal.TraceTrufflePerformanceWarnings=true",
-  "-Dgraal.Dump=",
+  // "-Dgraal.Dump=",
   "-Dgraal.TruffleBackgroundCompilation=false"
 )
 

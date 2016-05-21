@@ -160,7 +160,8 @@ final public class Apply {
         public abstract Object executeDispatch(VirtualFrame frame, Closure funcValue, Object[] args);
 
         @Specialization(limit = "INLINE_CACHE_SIZE",
-                guards = "funcValue.target() == cached.target()")
+                guards = "funcValue.target() == cached.target()",
+                assumptions = "cached.targetNotChanged()")
         protected static Object doDirect(VirtualFrame frame,
                                          Closure funcValue,
                                          Object[] args, //

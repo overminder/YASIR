@@ -6,6 +6,7 @@ import com.oracle.truffle.api.frame.FrameSlot;
 import com.oracle.truffle.api.frame.FrameSlotTypeException;
 import com.oracle.truffle.api.frame.VirtualFrame;
 
+// This is problematic!
 @NodeField(name = "slot", type = FrameSlot.class)
 public abstract class ReadLocalNode extends Expr {
     abstract FrameSlot getSlot();

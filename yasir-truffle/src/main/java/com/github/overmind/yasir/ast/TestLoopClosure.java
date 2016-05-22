@@ -13,14 +13,78 @@ import com.oracle.truffle.api.profiles.ConditionProfile;
 // Loops and tail calls.
 public final class TestLoopClosure {
     public static Closure create() {
-        return createFastest();
+        return createFaster();
     }
 
     public static long call(long n) {
         return (Long) Yasir.createCallTarget(ApplyNode.known(createFast(), PrimOp.lit(n))).call();
     }
 
-    // With boxed long.
+    // With boxed long, repeatingNode and primop and var read/write nodes.
+    private static Closure createFaster() {
+        Closure loop = Closure.empty("loop-fast");
+
+        FrameDescriptor fd = new FrameDescriptor();
+        FrameSlot i = fd.addFrameSlot("i");
+        FrameSlot s = fd.addFrameSlot("s");
+
+        class LoopBody extends Node implements RepeatingNode {
+            @Child Expr check = PrimOp.lt(PrimOp.lit(0L), Vars.read(i));
+            Expr addSI = Vars.write(s, PrimOp.add(Vars.read(s), Vars.read(i)));
+            Expr subI1 = Vars.write(i, PrimOp.sub(Vars.read(i), PrimOp.lit(1)));
+            @Child Expr body = Begin.create(addSI, subI1);
+
+            @Override
+            public boolean executeRepeating(VirtualFrame frame) {
+                try {
+                    if (check.executeBoolean(frame)) {
+                        body.executeGeneric(frame);
+                        return true;
+                    } else {
+                        return false;
+                    }
+                } catch (UnexpectedResultException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+
+        Expr simpleReadS = new Expr() {
+            @Override
+            public Object executeGeneric(VirtualFrame frame) {
+                try {
+                    return frame.getObject(s);
+                } catch (FrameSlotTypeException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
+
+        loop.setTarget(Yasir.createCallTarget(Begin.create(
+                Vars.write(i, Vars.read(0)),
+                Vars.write(s, PrimOp.lit(0L)),
+                new Expr() {
+                    @Child private LoopNode loopBody = Yasir.rt().createLoopNode(new LoopBody());
+                    @Child private Expr result = Vars.read(s);
+                    @Override
+                    public Object executeGeneric(VirtualFrame frame) {
+                        // frame.setObject(i, frame.getArguments()[0]);
+                        // frame.setObject(s, 0L);
+                        loopBody.executeLoop(frame);
+
+                        // try {
+                        //     return frame.getObject(s);
+                        // } catch (FrameSlotTypeException e) {
+                        //     throw new RuntimeException(e);
+                        // }
+                        return result.executeGeneric(frame);
+                    }
+        }), fd));
+
+        return loop;
+    }
+
+    // With boxed long and repeating node.
     private static Closure createFastestBoxed() {
         Closure loop = Closure.empty("loop-fast");
 
@@ -32,8 +96,8 @@ public final class TestLoopClosure {
             @Override
             public boolean executeRepeating(VirtualFrame frame) {
                 try {
-                    frame.setObject(s, (Long) frame.getObject(i) + (Long) frame.getObject(s));
                     if ((Long) frame.getValue(i) > 0) {
+                        frame.setObject(s, (Long) frame.getObject(i) + (Long) frame.getObject(s));
                         frame.setObject(i, (Long) frame.getObject(i) - 1L);
                         return true;
                     } else {
@@ -63,7 +127,7 @@ public final class TestLoopClosure {
         return loop;
     }
 
-    // With unboxed long.
+    // With unboxed long and repeating node.
     // Not sure why this is slower than the boxed version...
     private static Closure createFastest() {
         Closure loop = Closure.empty("loop-fast");

@@ -21,8 +21,8 @@ public class Main {
     static void bench() {
         Expr fiboN = Simple.makeBench(
                 5 /* count */,
-                10000000 /* warmup */,
-                300000000 /* arg */,
+                100000 /* warmup */,
+                100000000 /* arg */,
                 TestLoopClosure.create());
         Yasir.rt().createCallTarget(RootEntry.create(fiboN)).call();
     }

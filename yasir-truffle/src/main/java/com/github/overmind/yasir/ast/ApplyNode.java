@@ -1,5 +1,6 @@
 package com.github.overmind.yasir.ast;
 
+import com.github.overmind.yasir.interp.InterpException;
 import com.github.overmind.yasir.value.Closure;
 import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.frame.VirtualFrame;
@@ -15,12 +16,28 @@ public final class ApplyNode {
         return new UnknownApplyNode(func, args);
     }
 
+    // And is tail call.
+    public static Expr unknownWithPayload(Expr func, Expr... args) {
+        return new UnknownApplyWithPayloadNode(func, args);
+    }
+
     @ExplodeLoop
     static Object[] evalArgs(VirtualFrame frame, Expr[] args) {
         CompilerAsserts.compilationConstant(args.length);
         Object[] values = new Object[args.length];
         for (int i = 0; i < args.length; ++i) {
             values[i] = args[i].executeGeneric(frame);
+        }
+        return values;
+    }
+
+    @ExplodeLoop
+    static Object[] evalArgs(VirtualFrame frame, Closure funcValue, Expr[] args) {
+        CompilerAsserts.compilationConstant(args.length);
+        Object[] values = new Object[args.length + 1];
+        values[0] = funcValue;
+        for (int i = 0; i < args.length; ++i) {
+            values[i + 1] = args[i].executeGeneric(frame);
         }
         return values;
     }
@@ -48,6 +65,42 @@ public final class ApplyNode {
                         evalArgs(frame, args));
             } catch (UnexpectedResultException e) {
                 throw new RuntimeException(e);
+            }
+        }
+    }
+
+    public static class UnknownApplyWithPayloadNode extends Expr {
+        @Child
+        private Expr func;
+
+        @Children
+        private final Expr[] args;
+
+        @Child
+        protected DispatchClosureNode dispatchNode = DispatchClosureNodeGen.create();
+
+        public UnknownApplyWithPayloadNode(Expr func, Expr... args) {
+            this.func = func;
+            this.args = args;
+        }
+
+        @Override
+        public Object executeGeneric(VirtualFrame frame) {
+            Closure funcValue;
+            Object[] argValues;
+            try {
+                funcValue = func.executeClosure(frame);
+            } catch (UnexpectedResultException e) {
+                throw new RuntimeException(e);
+            }
+            argValues = evalArgs(frame, funcValue, args);
+            while (true) {
+                try {
+                    return dispatchNode.executeDispatch(frame, funcValue, argValues);
+                } catch (InterpException.TrampolineException e) {
+                    funcValue = e.func;
+                    argValues = e.args;
+                }
             }
         }
     }

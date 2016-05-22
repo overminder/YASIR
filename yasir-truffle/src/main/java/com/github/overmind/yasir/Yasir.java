@@ -1,7 +1,10 @@
 package com.github.overmind.yasir;
 
+import com.github.overmind.yasir.ast.Expr;
+import com.github.overmind.yasir.ast.RootEntry;
 import com.oracle.truffle.api.*;
 import com.oracle.truffle.api.frame.Frame;
+import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
@@ -17,6 +20,15 @@ public class Yasir {
 
     public static TruffleRuntime rt() {
         return Truffle.getRuntime();
+    }
+
+    // Shorthands
+    public static RootCallTarget createCallTarget(Expr body, FrameDescriptor fd) {
+        return rt().createCallTarget(RootEntry.create(body, fd));
+    }
+
+    public static RootCallTarget createCallTarget(Expr body) {
+        return rt().createCallTarget(RootEntry.create(body));
     }
 
     @ExplodeLoop

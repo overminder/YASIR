@@ -6,6 +6,8 @@ import com.github.overmind.yasir.value.Closure;
 import com.github.overmind.yasir.value.Nil;
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.dsl.*;
+import com.oracle.truffle.api.frame.FrameSlot;
+import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.LoopNode;
 import com.oracle.truffle.api.nodes.Node;
@@ -30,8 +32,8 @@ public final class PrimOp {
         return PrimOpFactory.LongLitNodeGen.create(v);
     }
 
-    public static Expr lit(Closure c) {
-        return PrimOpFactory.ClosureLitNodeGen.create(c);
+    public static Expr lit(Object o) {
+        return PrimOpFactory.ObjectLitNodeGen.create(o);
     }
 
     public static Expr callAdd(Expr lhs, Expr rhs) {
@@ -46,7 +48,7 @@ public final class PrimOp {
         return makeBinaryCall(PrimOpFactory.LtFactory.getInstance(), lhs, rhs);
     }
 
-    static Closure makeBinaryClosure(NodeFactory<? extends Expr> factory) {
+    public static Closure makeBinaryClosure(NodeFactory<? extends Expr> factory) {
         RootNode root = new RootNode(Yasir.getLanguageClass(), SourceSection.createUnavailable("builtin", null), null) {
             @Child
             private Expr body = factory.createNode(ReadArgNodeGen.create(0), ReadArgNodeGen.create(1));
@@ -76,8 +78,28 @@ public final class PrimOp {
     }
 
     public static Expr bench(Expr body, int count) {
-
         return new Bench(body, count);
+    }
+
+    public static Expr readArray(Expr array, int ix) {
+        return PrimOpFactory.ReadFixedArraySlotNodeGen.create(array, ix);
+    }
+
+    public static Expr readMatFrame(Expr matFrame, FrameSlot ix) {
+        return PrimOpFactory.ReadMatFrameSlotNodeGen.create(matFrame, ix);
+    }
+
+    public static Expr matFrame() {
+        return new Expr() {
+            @Override
+            public Object executeGeneric(VirtualFrame frame) {
+                return frame.materialize();
+            }
+        };
+    }
+
+    public static Expr readPayload(Expr expr, int i) {
+        return PrimOpFactory.ReadClosurePayloadNodeGen.create(expr, i);
     }
 
     @NodeField(name = "value", type = long.class)
@@ -86,10 +108,10 @@ public final class PrimOp {
         abstract long getValue();
     }
 
-    @NodeField(name = "value", type = Closure.class)
-    static abstract class ClosureLit extends Expr {
+    @NodeField(name = "value", type = Object.class)
+    static abstract class ObjectLit extends Expr {
         @Specialization
-        abstract Closure getValue();
+        abstract Object getValue();
     }
 
     @NodeChild("value")
@@ -105,6 +127,37 @@ public final class PrimOp {
         @Specialization
         protected Object read(Box box) {
             return box.value();
+        }
+    }
+
+    @NodeChild("array")
+    @NodeField(name = "ix", type = int.class)
+    static abstract class ReadFixedArraySlot extends Expr {
+        abstract int getIx();
+        @Specialization
+        protected Object read(Object[] array) {
+            return array[getIx()];
+        }
+    }
+
+    @NodeChild("closure")
+    @NodeField(name = "ix", type = int.class)
+    static abstract class ReadClosurePayload extends Expr {
+        abstract int getIx();
+
+        @Specialization
+        protected Object read(Closure closure) {
+            return ((Object[]) closure.payload())[getIx()];
+        }
+    }
+
+    @NodeChild("matFrame")
+    @NodeField(name = "ix", type = FrameSlot.class)
+    static abstract class ReadMatFrameSlot extends Expr {
+        abstract FrameSlot getIx();
+        @Specialization
+        protected Object read(MaterializedFrame matFrame) {
+            return matFrame.getValue(getIx());
         }
     }
 

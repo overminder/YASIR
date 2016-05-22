@@ -1,6 +1,6 @@
 package com.github.overmind.yasir.interp;
 
-import com.oracle.truffle.api.CallTarget;
+import com.github.overmind.yasir.value.Closure;
 
 public final class InterpException {
     public static RuntimeException unexpected(Exception e) {
@@ -11,8 +11,8 @@ public final class InterpException {
         return new UnexpectedInterpException(new Exception(msg));
     }
 
-    public static TrampolineException tailCall(CallTarget target, Object[] args) {
-        return new TrampolineException(target, args);
+    public static TrampolineException tailCall(Closure func, Object[] args) {
+        return new TrampolineException(func, args);
     }
 
     static class UnexpectedInterpException extends RuntimeException {
@@ -23,12 +23,12 @@ public final class InterpException {
         }
     }
 
-    private static class TrampolineException {
-        public final CallTarget target;
+    public static class TrampolineException extends RuntimeException {
+        public final Closure func;
         public final Object[] args;
 
-        public TrampolineException(CallTarget target, Object[] args) {
-            this.target = target;
+        public TrampolineException(Closure target, Object[] args) {
+            this.func = target;
             this.args = args;
         }
     }

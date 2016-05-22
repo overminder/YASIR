@@ -7,6 +7,10 @@ public final class Vars {
         return ReadLocalNodeGen.create(slot);
     }
 
+    public static Expr read(int ix) {
+        return ReadArgNodeGen.create(ix);
+    }
+
     public static Expr readBox(FrameSlot slot) {
         return PrimOp.readBox(read(slot));
     }

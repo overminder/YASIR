@@ -19,7 +19,7 @@ public abstract class DispatchClosureNode extends Node {
     protected static Object doDirect(VirtualFrame frame, Closure function, Object[] arguments, //
                                      @Cached("function") Closure cachedFunction, //
                                      @Cached("create(cachedFunction.target())") DirectCallNode callNode) {
-    /* Inline cache hit, we are safe to execute the cached call target. */
+    /* Inline cache hit, we are safe to execute the cached call func. */
         return callNode.call(frame, arguments);
     }
 
@@ -32,7 +32,7 @@ public abstract class DispatchClosureNode extends Node {
     protected static Object doIndirect(VirtualFrame frame, Closure function, Object[] arguments, //
                                        @Cached("create()") IndirectCallNode callNode) {
     /*
-     * SL has a quite simple call lookup: just ask the function for the current call target, and
+     * SL has a quite simple call lookup: just ask the function for the current call func, and
      * call it.
      */
         return callNode.call(frame, function.target(), arguments);

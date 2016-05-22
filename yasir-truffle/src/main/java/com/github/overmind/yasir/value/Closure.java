@@ -9,11 +9,21 @@ public final class Closure {
     private CallTarget target;
     private final String name;
     private final CyclicAssumption targetNotChanged;
+    private final Object payload;
+
+    public static Closure empty(String name) {
+        return new Closure(null, name);
+    }
 
     public Closure(CallTarget target, String name) {
+        this(target, name, Nil.INSTANCE);
+    }
+
+    private Closure(CallTarget target, String name, Object payload) {
         this.target = target;
         this.name = name;
         targetNotChanged = new CyclicAssumption("Closure " + name + " not changed");
+        this.payload = payload;
     }
 
     @Override
@@ -36,5 +46,13 @@ public final class Closure {
 
     public String name() {
         return name;
+    }
+
+    public Object payload() {
+        return payload;
+    }
+
+    public Closure withPayloads(Object[] payloads) {
+        return new Closure(target, name, payloads);
     }
 }

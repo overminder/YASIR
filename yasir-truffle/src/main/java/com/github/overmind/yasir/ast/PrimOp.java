@@ -4,8 +4,10 @@ import com.github.overmind.yasir.Yasir;
 import com.github.overmind.yasir.value.Box;
 import com.github.overmind.yasir.value.Closure;
 import com.github.overmind.yasir.value.Nil;
+import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.dsl.*;
+import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameSlot;
 import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.frame.VirtualFrame;
@@ -48,6 +50,10 @@ public final class PrimOp {
         return makeBinaryCall(PrimOpFactory.LtFactory.getInstance(), lhs, rhs);
     }
 
+    public final static Closure ADD = makeBinaryClosure(PrimOpFactory.AddFactory.getInstance());
+    public final static Closure SUB = makeBinaryClosure(PrimOpFactory.SubFactory.getInstance());
+    public final static Closure LT = makeBinaryClosure(PrimOpFactory.LtFactory.getInstance());
+
     public static Closure makeBinaryClosure(NodeFactory<? extends Expr> factory) {
         RootNode root = new RootNode(Yasir.getLanguageClass(), SourceSection.createUnavailable("builtin", null), null) {
             @Child
@@ -86,16 +92,30 @@ public final class PrimOp {
     }
 
     public static Expr readMatFrame(Expr matFrame, FrameSlot ix) {
-        return PrimOpFactory.ReadMatFrameSlotNodeGen.create(matFrame, ix);
+        return ReadNonlocalNodeGen.create(matFrame, ix);
     }
 
-    public static Expr matFrame() {
+    public static Expr matCurrentFrame() {
         return new Expr() {
             @Override
             public Object executeGeneric(VirtualFrame frame) {
                 return frame.materialize();
             }
         };
+    }
+
+    public static Expr allocMatFrame(FrameSlot[] slots, Expr[] exprs, FrameDescriptor fd) {
+        Expr builder = new Expr() {
+            @Override
+            public Object executeGeneric(VirtualFrame frame) {
+                return Yasir.rt().createMaterializedFrame(new Object[0], fd);
+            }
+        };
+
+        for (int i = 0; i < slots.length; ++i) {
+            builder = WriteNonlocalNodeGen.create(builder, exprs[i], slots[i]);
+        }
+        return builder;
     }
 
     public static Expr readPayload(Expr expr, int i) {
@@ -148,16 +168,6 @@ public final class PrimOp {
         @Specialization
         protected Object read(Closure closure) {
             return ((Object[]) closure.payload())[getIx()];
-        }
-    }
-
-    @NodeChild("matFrame")
-    @NodeField(name = "ix", type = FrameSlot.class)
-    static abstract class ReadMatFrameSlot extends Expr {
-        abstract FrameSlot getIx();
-        @Specialization
-        protected Object read(MaterializedFrame matFrame) {
-            return matFrame.getValue(getIx());
         }
     }
 

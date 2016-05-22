@@ -2,6 +2,7 @@ package com.github.overmind.yasir;
 
 import com.github.overmind.yasir.ast.Expr;
 import com.github.overmind.yasir.ast.RootEntry;
+import com.github.overmind.yasir.ast.TestFiboClosure;
 import com.github.overmind.yasir.ast.TestLoopClosure;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 
@@ -20,10 +21,16 @@ public class Main {
 
     static void bench() {
         Expr fiboN = Simple.makeBench(
-                5 /* count */,
-                100000 /* warmup */,
-                100000000 /* arg */,
-                TestLoopClosure.create());
+                5, // count
+                100000, // warmup
+                100000000, // arg
+                TestLoopClosure.create()
+                /*
+                20, // warmup
+                40, // arg
+                TestFiboClosure.create()
+                */
+        );
         Yasir.rt().createCallTarget(RootEntry.create(fiboN)).call();
     }
 

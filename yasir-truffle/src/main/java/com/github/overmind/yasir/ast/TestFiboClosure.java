@@ -12,13 +12,19 @@ import com.oracle.truffle.api.nodes.UnexpectedResultException;
 
 import static com.github.overmind.yasir.Simple.array;
 
-// Playing with different compilation strategies for global variables.
-// What works: compilation constant, boxed compilation constant, pass in register (only for <= 4 args?)
-// What doesn't: pass too many args in registers (4x slow down), pass in array (3x slow down), pass
-// in materialized frame (7x slow down).
+// Playing with different compilation strategies for global functions.
+// What works (i.e, fibo(40) on my Sandy Bridge i5-2430M takes ~1 second):
+// - inlined primops
+// - function wrapped primops as compilation constants
+// - wrapped primops as boxed compilation constants,
+// - pass wrapped primops in register (only for <= 4 args?)
+// - pass wrapped primops in materialized frame (after fixing the ReadNonLocalNode)
+// What doesn't:
+// - pass too many wrapped primops in registers (4x slow down)
+// - pass wrapped primops in array (3x slow down)
 public final class TestFiboClosure {
     public static Closure create() {
-        return createInjectBoxedClosuresThroughCompilationContext();
+        return createPassMoreFuncInMaterializedFrame();
     }
 
     // Inlined primop nodes and constant closure pointer.
@@ -102,7 +108,7 @@ public final class TestFiboClosure {
     }
 
     // Passing all closure pointers (fibo, primops) from the parent's frame.
-    // 1/7x speed.
+    // 1x speed after fixing the ReadNonLocalNode. This is actually pretty good.
     public static Closure createPassMoreFuncInMaterializedFrame() {
         Closure fibo = new Closure(null, "fibo-closure");
         Closure fiboTrampo = new Closure(null, "fibo-trampo");
@@ -119,7 +125,7 @@ public final class TestFiboClosure {
                 Vars.write(addSlot, PrimOp.lit(PrimOp.makeBinaryClosure(PrimOpFactory.AddFactory.getInstance()))),
                 Vars.write(subSlot, PrimOp.lit(PrimOp.makeBinaryClosure(PrimOpFactory.SubFactory.getInstance()))),
                 Vars.write(ltSlot, PrimOp.lit(PrimOp.makeBinaryClosure(PrimOpFactory.LtFactory.getInstance()))),
-                ApplyNode.known(fibo, ReadArgNodeGen.create(0), PrimOp.matFrame())
+                ApplyNode.known(fibo, ReadArgNodeGen.create(0), PrimOp.matCurrentFrame())
         ), trampoFd);
 
         fibo.setTarget(Yasir.rt().createCallTarget(fiboRoot));

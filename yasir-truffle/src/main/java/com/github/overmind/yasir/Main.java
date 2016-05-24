@@ -22,14 +22,14 @@ public class Main {
     static void bench() {
         Expr fiboN = Simple.makeBench(
                 5, // count
+                /*
                 100000, // warmup
                 100000000, // arg
                 TestLoopClosure.create()
-                /*
-                20, // warmup
-                40, // arg
-                TestFiboClosure.create()
                 */
+                20, // warmup
+                25, // arg
+                TestFiboClosure.create()
         );
         Yasir.rt().createCallTarget(RootEntry.create(fiboN)).call();
     }

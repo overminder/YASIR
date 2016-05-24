@@ -1,6 +1,7 @@
 package com.github.overmind.yasir.ast;
 
 import com.github.overmind.yasir.Yasir;
+import com.github.overmind.yasir.value.BareFunction;
 import com.github.overmind.yasir.value.Box;
 import com.github.overmind.yasir.value.Closure;
 import com.oracle.truffle.api.frame.FrameDescriptor;
@@ -23,14 +24,14 @@ import static com.github.overmind.yasir.Simple.array;
 // - pass too many wrapped primops in registers (4x slow down)
 // - pass wrapped primops in array (3x slow down)
 public final class TestFiboClosure {
-    public static Closure create() {
-        return createPassMoreFuncInMaterializedFrame();
+    public static BareFunction create() {
+        return createFastCPSWithArrayBasedClosure();
     }
 
     // Inlined primop nodes and constant closure pointer.
     // 1x speed
-    public static Closure createFullyTruffled() {
-        Closure fibo = new Closure(null, "fibo-closure");
+    public static BareFunction createFullyTruffled() {
+        BareFunction fibo = new BareFunction(null, "fibo-closure");
         FrameDescriptor fd = new FrameDescriptor();
         FrameSlot n = fd.addFrameSlot("n", FrameSlotKind.Long);
         RootNode root = RootEntry.create(new FullyTruffled(n, fibo), fd);
@@ -40,9 +41,9 @@ public final class TestFiboClosure {
 
     // Inlined primop nodes and passing fibo's closure pointer as argument.
     // 1x speed
-    public static Closure createPassFunc() {
-        Closure fibo = new Closure(null, "fibo-closure");
-        Closure fiboTrampo = new Closure(null, "fibo-trampo");
+    public static BareFunction createPassFunc() {
+        BareFunction fibo = new BareFunction(null, "fibo-closure");
+        BareFunction fiboTrampo = new BareFunction(null, "fibo-trampo");
 
         RootNode fiboRoot = RootEntry.create(new TestFiboClosure.PassFunc());
         RootNode fiboTrampoRoot = RootEntry.create(
@@ -55,9 +56,9 @@ public final class TestFiboClosure {
 
     // Inlined primop nodes and passing fibo's closure pointer as boxed argument.
     // 1x speed
-    public static Closure createPassFuncBoxed() {
-        Closure fibo = new Closure(null, "fibo-closure");
-        Closure fiboTrampo = new Closure(null, "fibo-trampo");
+    public static BareFunction createPassFuncBoxed() {
+        BareFunction fibo = new BareFunction(null, "fibo-closure");
+        BareFunction fiboTrampo = new BareFunction(null, "fibo-trampo");
 
         RootNode fiboRoot = RootEntry.create(new TestFiboClosure.PassFuncBoxed());
         RootNode fiboTrampoRoot = RootEntry.create(
@@ -70,9 +71,9 @@ public final class TestFiboClosure {
 
     // Passing all closure pointers (fibo, primops) as separate arguments.
     // 1/4x speed.
-    public static Closure createPassMoreFunc() {
-        Closure fibo = new Closure(null, "fibo-closure");
-        Closure fiboTrampo = new Closure(null, "fibo-trampo");
+    public static BareFunction createPassMoreFunc() {
+        BareFunction fibo = new BareFunction(null, "fibo-closure");
+        BareFunction fiboTrampo = new BareFunction(null, "fibo-trampo");
 
         RootNode fiboRoot = RootEntry.create(new PassMoreFunc());
         RootNode fiboTrampoRoot = RootEntry.create(
@@ -89,9 +90,9 @@ public final class TestFiboClosure {
 
     // Passing all closure pointers (fibo, primops) as an array argument.
     // 1/3x speed.
-    public static Closure createPassMoreFuncInArray() {
-        Closure fibo = new Closure(null, "fibo-closure");
-        Closure fiboTrampo = new Closure(null, "fibo-trampo");
+    public static BareFunction createPassMoreFuncInArray() {
+        BareFunction fibo = new BareFunction(null, "fibo-closure");
+        BareFunction fiboTrampo = new BareFunction(null, "fibo-trampo");
 
         RootNode fiboRoot = RootEntry.create(new PassMoreFuncInArray());
         RootNode fiboTrampoRoot = RootEntry.create(
@@ -108,10 +109,10 @@ public final class TestFiboClosure {
     }
 
     // Passing all closure pointers (fibo, primops) from the parent's frame.
-    // 1x speed after fixing the ReadNonLocalNode. This is actually pretty good.
-    public static Closure createPassMoreFuncInMaterializedFrame() {
-        Closure fibo = new Closure(null, "fibo-closure");
-        Closure fiboTrampo = new Closure(null, "fibo-trampo");
+    // 5.5x speed after fixing the ReadNonLocalNode. Still not quite good.
+    public static BareFunction createPassMoreFuncInParentsMatFrame() {
+        BareFunction fibo = new BareFunction(null, "fibo-closure");
+        BareFunction fiboTrampo = new BareFunction(null, "fibo-trampo");
         FrameDescriptor trampoFd = new FrameDescriptor();
 
         FrameSlot fiboSlot = trampoFd.addFrameSlot("fibo");
@@ -133,16 +134,83 @@ public final class TestFiboClosure {
         return fiboTrampo;
     }
 
+    // Same as above, 5.5x.
+    public static BareFunction createPassMoreFuncInFreshlyCreatedMatFrame() {
+        BareFunction fibo = new BareFunction(null, "fibo-closure");
+        BareFunction fiboTrampo = new BareFunction(null, "fibo-trampo");
+        FrameDescriptor trampoFd = new FrameDescriptor();
+
+        FrameSlot fiboSlot = trampoFd.addFrameSlot("fibo");
+        FrameSlot addSlot = trampoFd.addFrameSlot("add");
+        FrameSlot subSlot = trampoFd.addFrameSlot("sub");
+        FrameSlot ltSlot = trampoFd.addFrameSlot("lt");
+
+        RootNode fiboRoot = RootEntry.create
+                (new PassMoreFuncInMatFrame(fiboSlot, addSlot, subSlot, ltSlot));
+        RootNode fiboTrampoRoot = RootEntry.create(
+                ApplyNode.known(fibo,
+                        ReadArgNodeGen.create(0),
+                        PrimOp.allocMatFrame(
+                                array(fiboSlot, addSlot, subSlot, ltSlot),
+                                array(PrimOp.lit(fibo),
+                                        PrimOp.lit(PrimOp.ADD),
+                                        PrimOp.lit(PrimOp.SUB),
+                                        PrimOp.lit(PrimOp.LT)
+                                ),
+                                trampoFd
+                        )
+                )
+        );
+
+        fibo.setTarget(Yasir.rt().createCallTarget(fiboRoot));
+        fiboTrampo.setTarget(Yasir.rt().createCallTarget(fiboTrampoRoot));
+        return fiboTrampo;
+    }
+
+    // Also save into local.
+    // Same as above, 5.5x.
+    public static BareFunction createPassMoreFuncInFreshlyCreatedMatFrameIntoLocal() {
+        BareFunction fibo = new BareFunction(null, "fibo-closure");
+        BareFunction fiboTrampo = new BareFunction(null, "fibo-trampo");
+        FrameDescriptor trampoFd = new FrameDescriptor();
+
+        FrameSlot fiboSlot = trampoFd.addFrameSlot("fibo");
+        FrameSlot addSlot = trampoFd.addFrameSlot("add");
+        FrameSlot subSlot = trampoFd.addFrameSlot("sub");
+        FrameSlot ltSlot = trampoFd.addFrameSlot("lt");
+
+        PassMoreFuncInMatFrameIntoLocal fiboE = new PassMoreFuncInMatFrameIntoLocal(fiboSlot, addSlot, subSlot, ltSlot);
+        RootNode fiboRoot = RootEntry.create(fiboE, fiboE.fd);
+        RootNode fiboTrampoRoot = RootEntry.create(
+                ApplyNode.known(fibo,
+                        ReadArgNodeGen.create(0),
+                        PrimOp.allocMatFrame(
+                                array(fiboSlot, addSlot, subSlot, ltSlot),
+                                array(PrimOp.lit(fibo),
+                                        PrimOp.lit(PrimOp.ADD),
+                                        PrimOp.lit(PrimOp.SUB),
+                                        PrimOp.lit(PrimOp.LT)
+                                ),
+                                trampoFd
+                        )
+                )
+        );
+
+        fibo.setTarget(Yasir.rt().createCallTarget(fiboRoot));
+        fiboTrampo.setTarget(Yasir.rt().createCallTarget(fiboTrampoRoot));
+        return fiboTrampo;
+    }
+
     // Inline all closure pointers (fibo, primops) in the code.
     // 1x speed.
     // This is what SL uses. And yes, this is among the fastest implementations.
-    public static Closure createInjectClosuresThroughCompilationContext() {
-        Closure fibo = new Closure(null, "fibo-closure");
-        Closure fiboTrampo = new Closure(null, "fibo-trampo");
+    public static BareFunction createInjectClosuresThroughCompilationContext() {
+        BareFunction fibo = new BareFunction(null, "fibo-closure");
+        BareFunction fiboTrampo = new BareFunction(null, "fibo-trampo");
 
-        Closure add = PrimOp.makeBinaryClosure(PrimOpFactory.AddFactory.getInstance());
-        Closure sub = PrimOp.makeBinaryClosure(PrimOpFactory.SubFactory.getInstance());
-        Closure lt = PrimOp.makeBinaryClosure(PrimOpFactory.LtFactory.getInstance());
+        BareFunction add = PrimOp.makeBinaryClosure(PrimOpFactory.AddFactory.getInstance());
+        BareFunction sub = PrimOp.makeBinaryClosure(PrimOpFactory.SubFactory.getInstance());
+        BareFunction lt = PrimOp.makeBinaryClosure(PrimOpFactory.LtFactory.getInstance());
 
         RootNode fiboRoot = RootEntry.create(
                 new InjectClosureThroughCompilationContext(fibo, add, sub, lt));
@@ -156,13 +224,13 @@ public final class TestFiboClosure {
 
     // Inline all closure pointers (fibo, primops) boxed in the code.
     // 1x speed.
-    public static Closure createInjectBoxedClosuresThroughCompilationContext() {
-        Closure fibo = new Closure(null, "fibo-closure");
-        Closure fiboTrampo = new Closure(null, "fibo-trampo");
+    public static BareFunction createInjectBoxedClosuresThroughCompilationContext() {
+        BareFunction fibo = new BareFunction(null, "fibo-closure");
+        BareFunction fiboTrampo = new BareFunction(null, "fibo-trampo");
 
-        Closure add = PrimOp.makeBinaryClosure(PrimOpFactory.AddFactory.getInstance());
-        Closure sub = PrimOp.makeBinaryClosure(PrimOpFactory.SubFactory.getInstance());
-        Closure lt = PrimOp.makeBinaryClosure(PrimOpFactory.LtFactory.getInstance());
+        BareFunction add = PrimOp.makeBinaryClosure(PrimOpFactory.AddFactory.getInstance());
+        BareFunction sub = PrimOp.makeBinaryClosure(PrimOpFactory.SubFactory.getInstance());
+        BareFunction lt = PrimOp.makeBinaryClosure(PrimOpFactory.LtFactory.getInstance());
 
         RootNode fiboRoot = RootEntry.create(
                 new InjectClosureThroughCompilationContext(fibo, add, sub, lt));
@@ -174,10 +242,11 @@ public final class TestFiboClosure {
     }
 
     // Fast: inline primops with only the fibo function CPS-ed.
-    static Expr createFastCPS() {
-        Closure fiboEntryC = Closure.empty("fibo-entry"),
-                fiboRet1C = Closure.empty("fibo-ret1"),
-                fiboRet2C = Closure.empty("fibo-ret2");
+    static BareFunction createFastCPSWithArrayBasedClosure() {
+        BareFunction fiboEntryB = BareFunction.empty("fibo-entry"),
+                fiboRet1C = BareFunction.empty("fibo-ret1"),
+                fiboRet2C = BareFunction.empty("fibo-ret2");
+        Closure fiboEntryC = fiboEntryB.withPayloads(array());
         Expr fiboEntry, fiboRet1, fiboRet2;
         {
             fiboEntry = new Expr() {
@@ -190,11 +259,11 @@ public final class TestFiboClosure {
                         recurNode);
 
                 private Expr readN() {
-                    return Vars.read(0);
+                    return Vars.read(1);
                 }
 
                 private Expr readK() {
-                    return Vars.read(1);
+                    return Vars.read(2);
                 }
 
                 @Override
@@ -262,16 +331,119 @@ public final class TestFiboClosure {
             };
         }
 
-        fiboEntryC.setTarget(Yasir.rt().createCallTarget(RootEntry.create(fiboEntry)));
+        fiboEntryB.setTarget(Yasir.rt().createCallTarget(RootEntry.create(fiboEntry)));
         fiboRet1C.setTarget(Yasir.rt().createCallTarget(RootEntry.create(fiboRet1)));
         fiboRet2C.setTarget(Yasir.rt().createCallTarget(RootEntry.create(fiboRet2)));
 
-        Closure id = new Closure(Yasir.rt().createCallTarget(RootEntry.create(Vars.read(0))), "id");
-        Closure fibo = new Closure(Yasir.rt().createCallTarget(RootEntry.create(
-                ApplyNode.known(fiboEntryC, Vars.read(0), PrimOp.lit(id)))),
+        BareFunction idB = new BareFunction(Yasir.rt().createCallTarget(RootEntry.create(Vars.read(1))), "id");
+        Closure idC = idB.withPayloads(array());
+        BareFunction fibo = new BareFunction(Yasir.rt().createCallTarget(RootEntry.create(
+                ApplyNode.known(fiboEntryB, PrimOp.lit(fiboEntryB), Vars.read(0), PrimOp.lit(idC)))),
                 "fibo");
 
-        return PrimOp.lit(fibo);
+        return fibo;
+    }
+
+    static BareFunction createFastCPSWithMatFrameBasedClosure() {
+        BareFunction fiboEntryB = BareFunction.empty("fibo-entry"),
+                fiboRet1C = BareFunction.empty("fibo-ret1"),
+                fiboRet2C = BareFunction.empty("fibo-ret2");
+        Closure fiboEntryC = fiboEntryB.withPayloads(array());
+        Expr fiboEntry, fiboRet1, fiboRet2;
+        {
+            fiboEntry = new Expr() {
+                Expr isBaseCase = PrimOp.lt(readN(), PrimOp.lit(2));
+                Expr nSub1 = PrimOp.sub(readN(), PrimOp.lit(1));
+                Expr mkK = Closures.alloc(fiboRet1C, readN(), readK());
+                Expr recurNode = ApplyNode.unknownWithPayload(PrimOp.lit(fiboEntryC), nSub1, mkK);
+                @Child Expr body = new IfNode(isBaseCase,
+                        ApplyNode.unknownWithPayload(readK(), readN()),
+                        recurNode);
+
+                private Expr readN() {
+                    return Vars.read(1);
+                }
+
+                private Expr readK() {
+                    return Vars.read(2);
+                }
+
+                @Override
+                public Object executeGeneric(VirtualFrame frame) {
+                    return body.executeGeneric(frame);
+                }
+            };
+        }
+
+        {
+            fiboRet1 = new Expr() {
+                Expr nSub2 = PrimOp.sub(readN(), PrimOp.lit(2));
+                Expr mkK = Closures.alloc(fiboRet2C, readRes(), readK());
+                Expr recurNode = ApplyNode.unknownWithPayload(PrimOp.lit(fiboEntryC), nSub2, mkK);
+                @Child Expr body = recurNode;
+
+                private Expr readClosure() {
+                    return Vars.read(0);
+                }
+
+                private Expr readRes() {
+                    return Vars.read(1);
+                }
+
+                private Expr readN() {
+                    return PrimOp.readPayload(readClosure(), 0);
+                }
+
+                private Expr readK() {
+                    return PrimOp.readPayload(readClosure(), 1);
+                }
+
+                @Override
+                public Object executeGeneric(VirtualFrame frame) {
+                    return body.executeGeneric(frame);
+                }
+            };
+        }
+
+        {
+            fiboRet2 = new Expr() {
+                Expr add = PrimOp.add(readRes(), readPrevRes());
+                @Child Expr body = ApplyNode.unknownWithPayload(readK(), add);
+
+                private Expr readClosure() {
+                    return Vars.read(0);
+                }
+
+                private Expr readRes() {
+                    return Vars.read(1);
+                }
+
+                private Expr readPrevRes() {
+                    return PrimOp.readPayload(readClosure(), 0);
+                }
+
+                private Expr readK() {
+                    return PrimOp.readPayload(readClosure(), 1);
+                }
+
+                @Override
+                public Object executeGeneric(VirtualFrame frame) {
+                    return body.executeGeneric(frame);
+                }
+            };
+        }
+
+        fiboEntryB.setTarget(Yasir.rt().createCallTarget(RootEntry.create(fiboEntry)));
+        fiboRet1C.setTarget(Yasir.rt().createCallTarget(RootEntry.create(fiboRet1)));
+        fiboRet2C.setTarget(Yasir.rt().createCallTarget(RootEntry.create(fiboRet2)));
+
+        BareFunction idB = new BareFunction(Yasir.rt().createCallTarget(RootEntry.create(Vars.read(1))), "id");
+        Closure idC = idB.withPayloads(array());
+        BareFunction fibo = new BareFunction(Yasir.rt().createCallTarget(RootEntry.create(
+                ApplyNode.known(fiboEntryB, PrimOp.lit(fiboEntryB), Vars.read(0), PrimOp.lit(idC)))),
+                "fibo");
+
+        return fibo;
     }
 
     static class InjectBoxedClosureThroughCompilationContext extends Expr {
@@ -283,7 +455,7 @@ public final class TestFiboClosure {
         Box sub;
         Box lt;
 
-        InjectBoxedClosureThroughCompilationContext(Closure fibo, Closure add, Closure sub, Closure lt) {
+        InjectBoxedClosureThroughCompilationContext(BareFunction fibo, BareFunction add, BareFunction sub, BareFunction lt) {
             this.fibo = new Box(fibo);
             this.add = new Box(add);
             this.sub = new Box(sub);
@@ -328,12 +500,12 @@ public final class TestFiboClosure {
         @Child
         private Expr body;
 
-        Closure fibo;
-        Closure add;
-        Closure sub;
-        Closure lt;
+        BareFunction fibo;
+        BareFunction add;
+        BareFunction sub;
+        BareFunction lt;
 
-        InjectClosureThroughCompilationContext(Closure fibo, Closure add, Closure sub, Closure lt) {
+        InjectClosureThroughCompilationContext(BareFunction fibo, BareFunction add, BareFunction sub, BareFunction lt) {
             this.fibo = fibo;
             this.add = add;
             this.sub = sub;
@@ -366,6 +538,97 @@ public final class TestFiboClosure {
 
         Expr readLt() {
             return PrimOp.lit(lt);
+        }
+
+        @Override
+        public Object executeGeneric(VirtualFrame frame) {
+            return body.executeGeneric(frame);
+        }
+    }
+
+    static class PassMoreFuncInMatFrameIntoLocal extends Expr {
+        private final FrameSlot fiboL;
+        private final FrameSlot addL;
+        private final FrameSlot subL;
+        private final FrameSlot ltL;
+
+        @Child
+        private Expr body;
+
+        FrameSlot fibo;
+        FrameSlot add;
+        FrameSlot sub;
+        FrameSlot lt;
+
+        final FrameDescriptor fd = new FrameDescriptor();
+
+        PassMoreFuncInMatFrameIntoLocal(FrameSlot fibo, FrameSlot add, FrameSlot sub, FrameSlot lt) {
+            this.fibo = fibo;
+            this.add = add;
+            this.sub = sub;
+            this.lt = lt;
+
+            this.fiboL = fd.addFrameSlot("fibo");
+            this.addL = fd.addFrameSlot("add");
+            this.subL = fd.addFrameSlot("sub");
+            this.ltL = fd.addFrameSlot("lt");
+
+            Expr assignArgs = Begin.create(
+                    Vars.write(fiboL, readFibo()),
+                    Vars.write(addL, readAdd()),
+                    Vars.write(subL, readSub()),
+                    Vars.write(ltL, readLt())
+            );
+
+            Expr isBaseCase = ApplyNode.unknown(readLtL(), readN(), PrimOp.lit(2));
+            Expr nSub1 = ApplyNode.unknown(readSubL(), readN(), PrimOp.lit(1));
+            Expr nSub2 = ApplyNode.unknown(readSubL(), readN(), PrimOp.lit(2));
+            Expr ap1 = ApplyNode.unknown(readFiboL(), nSub1,
+                    readPayload());
+            Expr ap2 = ApplyNode.unknown(readFiboL(), nSub2,
+                    readPayload());
+            Expr recurNode = ApplyNode.unknown(readAddL(), ap1, ap2);
+            body = Begin.create(assignArgs, new IfNode(isBaseCase, readN(), recurNode));
+        }
+
+        Expr readN() {
+            return ReadArgNodeGen.create(0);
+        }
+
+        Expr readPayload() {
+            return ReadArgNodeGen.create(1);
+        }
+
+        Expr readFibo() {
+            return PrimOp.readMatFrame(readPayload(), fibo);
+        }
+
+        Expr readFiboL() {
+            return Vars.read(fiboL);
+        }
+
+        Expr readAdd() {
+            return PrimOp.readMatFrame(readPayload(), add);
+        }
+
+        Expr readAddL() {
+            return Vars.read(addL);
+        }
+
+        Expr readSub() {
+            return PrimOp.readMatFrame(readPayload(), sub);
+        }
+
+        Expr readSubL() {
+            return Vars.read(subL);
+        }
+
+        Expr readLt() {
+            return PrimOp.readMatFrame(readPayload(), lt);
+        }
+
+        Expr readLtL() {
+            return Vars.read(ltL);
         }
 
         @Override
@@ -596,7 +859,7 @@ public final class TestFiboClosure {
         @Child
         private Expr body;
 
-        FullyTruffled(FrameSlot n, Closure fibo) {
+        FullyTruffled(FrameSlot n, BareFunction fibo) {
             this.n = n;
 
             populateFrame = WriteLocalNodeGen.create(readArg(), n);
@@ -625,7 +888,7 @@ public final class TestFiboClosure {
     // Some of the constructs are in Java.
     static class Fast extends Expr {
         private final FrameSlot n;
-        private final Closure fibo;
+        private final BareFunction fibo;
         @Child
         private WriteLocalNode populateFrame;
         @Child
@@ -642,7 +905,7 @@ public final class TestFiboClosure {
         @Child
         private Expr recurNode;
 
-        Fast(FrameSlot n, Closure fibo) {
+        Fast(FrameSlot n, BareFunction fibo) {
             this.n = n;
             this.fibo = fibo;
             Expr loadFibo = PrimOp.lit(fibo);

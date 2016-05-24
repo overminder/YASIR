@@ -1,15 +1,14 @@
 package com.github.overmind.yasir.ast;
 
 import com.github.overmind.yasir.Yasir;
+import com.github.overmind.yasir.value.BareFunction;
 import com.github.overmind.yasir.value.Box;
 import com.github.overmind.yasir.value.Closure;
 import com.github.overmind.yasir.value.Nil;
-import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.dsl.*;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameSlot;
-import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.LoopNode;
 import com.oracle.truffle.api.nodes.Node;
@@ -50,11 +49,11 @@ public final class PrimOp {
         return makeBinaryCall(PrimOpFactory.LtFactory.getInstance(), lhs, rhs);
     }
 
-    public final static Closure ADD = makeBinaryClosure(PrimOpFactory.AddFactory.getInstance());
-    public final static Closure SUB = makeBinaryClosure(PrimOpFactory.SubFactory.getInstance());
-    public final static Closure LT = makeBinaryClosure(PrimOpFactory.LtFactory.getInstance());
+    public final static BareFunction ADD = makeBinaryClosure(PrimOpFactory.AddFactory.getInstance());
+    public final static BareFunction SUB = makeBinaryClosure(PrimOpFactory.SubFactory.getInstance());
+    public final static BareFunction LT = makeBinaryClosure(PrimOpFactory.LtFactory.getInstance());
 
-    public static Closure makeBinaryClosure(NodeFactory<? extends Expr> factory) {
+    public static BareFunction makeBinaryClosure(NodeFactory<? extends Expr> factory) {
         RootNode root = new RootNode(Yasir.getLanguageClass(), SourceSection.createUnavailable("builtin", null), null) {
             @Child
             private Expr body = factory.createNode(ReadArgNodeGen.create(0), ReadArgNodeGen.create(1));
@@ -64,7 +63,7 @@ public final class PrimOp {
                 return body.executeGeneric(frame);
             }
         };
-        return new Closure(Yasir.rt().createCallTarget(root), factory.getNodeClass().getName());
+        return new BareFunction(Yasir.rt().createCallTarget(root), factory.getNodeClass().getName());
     }
 
     static Expr makeBinaryCall(NodeFactory<? extends Expr> factory, Expr lhs, Expr rhs) {
@@ -166,8 +165,8 @@ public final class PrimOp {
         abstract int getIx();
 
         @Specialization
-        protected Object read(Closure closure) {
-            return ((Object[]) closure.payload())[getIx()];
+        protected Object read(Closure c) {
+            return c.payloadsAsArray()[getIx()];
         }
     }
 

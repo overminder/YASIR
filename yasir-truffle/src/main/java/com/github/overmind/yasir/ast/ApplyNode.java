@@ -1,6 +1,7 @@
 package com.github.overmind.yasir.ast;
 
 import com.github.overmind.yasir.interp.InterpException;
+import com.github.overmind.yasir.value.BareFunction;
 import com.github.overmind.yasir.value.Closure;
 import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.frame.VirtualFrame;
@@ -8,7 +9,7 @@ import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 
 public final class ApplyNode {
-    public static Expr known(Closure func, Expr... args) {
+    public static Expr known(BareFunction func, Expr... args) {
         return new KnownApplyNode(func, args);
     }
 
@@ -61,7 +62,7 @@ public final class ApplyNode {
         public Object executeGeneric(VirtualFrame frame) {
             try {
                 return dispatchNode.executeDispatch(frame,
-                        func.executeClosure(frame),
+                        func.executeBareFunction(frame),
                         evalArgs(frame, args));
             } catch (UnexpectedResultException e) {
                 throw new RuntimeException(e);
@@ -94,6 +95,30 @@ public final class ApplyNode {
                 throw new RuntimeException(e);
             }
             argValues = evalArgs(frame, funcValue, args);
+            throw InterpException.tailCall(funcValue.bareFunction, argValues);
+        }
+    }
+
+    public static class KnownApplyNode extends Expr {
+        private final BareFunction func;
+
+        @Children
+        private final Expr[] args;
+
+        @Child
+        protected DispatchClosureNode dispatchNode = DispatchClosureNodeGen.create();
+
+        public KnownApplyNode(BareFunction func, Expr... args) {
+            this.func = func;
+            this.args = args;
+        }
+
+        @Override
+        @ExplodeLoop
+        public Object executeGeneric(VirtualFrame frame) {
+            BareFunction funcValue = func;
+            Object[] argValues;
+            argValues = evalArgs(frame, args);
             while (true) {
                 try {
                     return dispatchNode.executeDispatch(frame, funcValue, argValues);
@@ -102,26 +127,6 @@ public final class ApplyNode {
                     argValues = e.args;
                 }
             }
-        }
-    }
-
-    public static class KnownApplyNode extends Expr {
-        private final Closure func;
-
-        @Children
-        private final Expr[] args;
-
-        @Child
-        protected DispatchClosureNode dispatchNode = DispatchClosureNodeGen.create();
-
-        public KnownApplyNode(Closure func, Expr... args) {
-            this.func = func;
-            this.args = args;
-        }
-
-        @Override
-        public Object executeGeneric(VirtualFrame frame) {
-            return dispatchNode.executeDispatch(frame, func, evalArgs(frame, args));
         }
 
     }

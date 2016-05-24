@@ -1,7 +1,7 @@
 package com.github.overmind.yasir;
 
 import com.github.overmind.yasir.ast.*;
-import com.github.overmind.yasir.value.Closure;
+import com.github.overmind.yasir.value.BareFunction;
 import com.oracle.truffle.api.frame.*;
 
 public class Simple {
@@ -10,7 +10,7 @@ public class Simple {
         return args;
     }
 
-    public static Expr makeBench(int count, long warmupN, long n, Closure c) {
+    public static Expr makeBench(int count, long warmupN, long n, BareFunction c) {
         FrameDescriptor mainFd = new FrameDescriptor();
         FrameSlot funcSlot = mainFd.addFrameSlot("funcSlot");
         FrameSlot nSlot = mainFd.addFrameSlot("n");

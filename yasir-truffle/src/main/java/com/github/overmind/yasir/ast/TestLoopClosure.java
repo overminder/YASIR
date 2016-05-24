@@ -1,7 +1,7 @@
 package com.github.overmind.yasir.ast;
 
 import com.github.overmind.yasir.Yasir;
-import com.github.overmind.yasir.value.Closure;
+import com.github.overmind.yasir.value.BareFunction;
 import com.github.overmind.yasir.value.Nil;
 import com.oracle.truffle.api.frame.*;
 import com.oracle.truffle.api.nodes.LoopNode;
@@ -14,7 +14,7 @@ import static com.github.overmind.yasir.Simple.array;
 
 // Loops and tail calls.
 public final class TestLoopClosure {
-    public static Closure create() {
+    public static BareFunction create() {
         return createPassingPrimOpsInFreshMatFrameIntoLocal();
     }
 
@@ -23,9 +23,9 @@ public final class TestLoopClosure {
     }
 
     // 1x. Storing the functions into local variables works.
-    private static Closure createPassingPrimOpsInFreshMatFrameIntoLocal() {
-        Closure trampo = Closure.empty("loop-pass-primops-trampo");
-        Closure loop = Closure.empty("loop-pass-primops");
+    private static BareFunction createPassingPrimOpsInFreshMatFrameIntoLocal() {
+        BareFunction trampo = BareFunction.empty("loop-pass-primops-trampo");
+        BareFunction loop = BareFunction.empty("loop-pass-primops");
 
         FrameDescriptor fd = new FrameDescriptor();
         FrameSlot i = fd.addFrameSlot("i");
@@ -85,9 +85,9 @@ public final class TestLoopClosure {
     }
 
     // Same as using the parent's mat frame (4x slow down). Not quite good.
-    private static Closure createPassingPrimOpsInFreshMatFrame() {
-        Closure trampo = Closure.empty("loop-pass-primops-trampo");
-        Closure loop = Closure.empty("loop-pass-primops");
+    private static BareFunction createPassingPrimOpsInFreshMatFrame() {
+        BareFunction trampo = BareFunction.empty("loop-pass-primops-trampo");
+        BareFunction loop = BareFunction.empty("loop-pass-primops");
 
         FrameDescriptor fd = new FrameDescriptor();
         FrameSlot i = fd.addFrameSlot("i");
@@ -145,9 +145,9 @@ public final class TestLoopClosure {
     // Primops function passed in an mat frame.
     // This incurs some (~4x) slow downs, but might be still acceptable. Note sure why
     // this can't be optimized...
-    private static Closure createPassingPrimOpsInParentsMatFrame() {
-        Closure trampo = Closure.empty("loop-pass-primops-trampo");
-        Closure loop = Closure.empty("loop-pass-primops");
+    private static BareFunction createPassingPrimOpsInParentsMatFrame() {
+        BareFunction trampo = BareFunction.empty("loop-pass-primops-trampo");
+        BareFunction loop = BareFunction.empty("loop-pass-primops");
 
         FrameDescriptor fd = new FrameDescriptor();
         FrameSlot i = fd.addFrameSlot("i");
@@ -202,9 +202,9 @@ public final class TestLoopClosure {
 
     // Primops function passed in an array arg. Also works - Graal's loop-based optimizations
     // are truly great.
-    private static Closure createPassingPrimOpsInArray() {
-        Closure trampo = Closure.empty("loop-pass-primops-trampo");
-        Closure loop = Closure.empty("loop-pass-primops");
+    private static BareFunction createPassingPrimOpsInArray() {
+        BareFunction trampo = BareFunction.empty("loop-pass-primops-trampo");
+        BareFunction loop = BareFunction.empty("loop-pass-primops");
 
         FrameDescriptor fd = new FrameDescriptor();
         FrameSlot i = fd.addFrameSlot("i");
@@ -249,9 +249,9 @@ public final class TestLoopClosure {
     }
 
     // Primops function passed in args. Works well.
-    private static Closure createPassingPrimOps() {
-        Closure trampo = Closure.empty("loop-pass-primops-trampo");
-        Closure loop = Closure.empty("loop-pass-primops");
+    private static BareFunction createPassingPrimOps() {
+        BareFunction trampo = BareFunction.empty("loop-pass-primops-trampo");
+        BareFunction loop = BareFunction.empty("loop-pass-primops");
 
         FrameDescriptor fd = new FrameDescriptor();
         FrameSlot i = fd.addFrameSlot("i");
@@ -299,8 +299,8 @@ public final class TestLoopClosure {
     }
 
     // With boxed long, repeatingNode and primop and var read/write nodes.
-    private static Closure createFaster() {
-        Closure loop = Closure.empty("loop-fast");
+    private static BareFunction createFaster() {
+        BareFunction loop = BareFunction.empty("loop-fast");
 
         FrameDescriptor fd = new FrameDescriptor();
         FrameSlot i = fd.addFrameSlot("i");
@@ -363,8 +363,8 @@ public final class TestLoopClosure {
     }
 
     // With boxed long and repeating node.
-    private static Closure createFastestBoxed() {
-        Closure loop = Closure.empty("loop-fast");
+    private static BareFunction createFastestBoxed() {
+        BareFunction loop = BareFunction.empty("loop-fast");
 
         FrameDescriptor fd = new FrameDescriptor();
         FrameSlot i = fd.addFrameSlot("i");
@@ -407,8 +407,8 @@ public final class TestLoopClosure {
 
     // With unboxed long and repeating node.
     // Not sure why this is slower than the boxed version...
-    private static Closure createFastest() {
-        Closure loop = Closure.empty("loop-fast");
+    private static BareFunction createFastest() {
+        BareFunction loop = BareFunction.empty("loop-fast");
 
         FrameDescriptor fd = new FrameDescriptor();
         FrameSlot i = fd.addFrameSlot("i", FrameSlotKind.Long);
@@ -450,11 +450,11 @@ public final class TestLoopClosure {
     }
 
     // Done in the standard Truffle way: inlined primops and repeating node.
-    private static Closure createStandard() {
-        Closure trampo = Closure.empty("loop-fast-trampo");
+    private static BareFunction createStandard() {
+        BareFunction trampo = BareFunction.empty("loop-fast-trampo");
 
         // [0]: closure ptr, [1]: i, [2]: s
-        Closure loop = Closure.empty("loop-fast");
+        BareFunction loop = BareFunction.empty("loop-fast");
 
         FrameDescriptor fd = new FrameDescriptor();
         FrameSlot i = fd.addFrameSlot("i");

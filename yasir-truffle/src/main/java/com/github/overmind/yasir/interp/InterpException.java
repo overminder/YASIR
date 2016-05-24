@@ -1,6 +1,6 @@
 package com.github.overmind.yasir.interp;
 
-import com.github.overmind.yasir.value.Closure;
+import com.github.overmind.yasir.value.BareFunction;
 
 public final class InterpException {
     public static RuntimeException unexpected(Exception e) {
@@ -11,7 +11,7 @@ public final class InterpException {
         return new UnexpectedInterpException(new Exception(msg));
     }
 
-    public static TrampolineException tailCall(Closure func, Object[] args) {
+    public static TrampolineException tailCall(BareFunction func, Object[] args) {
         return new TrampolineException(func, args);
     }
 
@@ -24,10 +24,10 @@ public final class InterpException {
     }
 
     public static class TrampolineException extends RuntimeException {
-        public final Closure func;
+        public final BareFunction func;
         public final Object[] args;
 
-        public TrampolineException(Closure target, Object[] args) {
+        public TrampolineException(BareFunction target, Object[] args) {
             this.func = target;
             this.args = args;
         }

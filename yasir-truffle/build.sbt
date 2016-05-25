@@ -26,7 +26,8 @@ javaOptions += localProperties.value.getProperty("bootcpOpt")
 javaOptions ++= Seq(
   // These used to be '-G:+${NAME}' (and require -XX:+UnlockDiagnosticVMOptions)
   // rather than '-Dgraal.${NAME}=true'...
-  // "-Dgraal.TraceTruffleCompilationDetails=true",
+  "-Dgraal.TraceTruffleCompilation=true",
+  "-Dgraal.TraceTruffleCompilationDetails=true",
   "-Dgraal.TraceTruffleInlining=true",
   // "-Dgraal.TraceTruffleTransferToInterpreter=true",
   "-Dgraal.TraceTrufflePerformanceWarnings=true",

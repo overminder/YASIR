@@ -1,16 +1,23 @@
 package com.github.overmind.yasir.ast;
 
+import com.github.overmind.yasir.Yasir;
 import com.github.overmind.yasir.interp.InterpException;
 import com.github.overmind.yasir.value.BareFunction;
 import com.github.overmind.yasir.value.Closure;
 import com.oracle.truffle.api.CompilerAsserts;
+import com.oracle.truffle.api.frame.FrameInstance;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
+import com.oracle.truffle.api.profiles.BranchProfile;
 
 public final class ApplyNode {
     public static Expr known(BareFunction func, Expr... args) {
         return new KnownApplyNode(func, args);
+    }
+
+    public static Expr knownTail(BareFunction func, Expr... args) {
+        return new KnownApplyNode(func, true, args);
     }
 
     public static Expr unknown(Expr func, Expr... args) {
@@ -60,13 +67,9 @@ public final class ApplyNode {
 
         @Override
         public Object executeGeneric(VirtualFrame frame) {
-            try {
-                return dispatchNode.executeDispatch(frame,
-                        func.executeBareFunction(frame),
-                        evalArgs(frame, args));
-            } catch (UnexpectedResultException e) {
-                throw new RuntimeException(e);
-            }
+            return dispatchNode.executeDispatch(frame,
+                    (BareFunction) func.executeGeneric(frame),
+                    evalArgs(frame, args));
         }
     }
 
@@ -89,11 +92,7 @@ public final class ApplyNode {
         public Object executeGeneric(VirtualFrame frame) {
             Closure funcValue;
             Object[] argValues;
-            try {
-                funcValue = func.executeClosure(frame);
-            } catch (UnexpectedResultException e) {
-                throw new RuntimeException(e);
-            }
+            funcValue = (Closure) func.executeGeneric(frame);
             argValues = evalArgs(frame, funcValue, args);
             throw InterpException.tailCall(funcValue.bareFunction, argValues);
         }
@@ -108,21 +107,36 @@ public final class ApplyNode {
         @Child
         protected DispatchClosureNode dispatchNode = DispatchClosureNodeGen.create();
 
+        final boolean tail;
+
+        private final BranchProfile tailTaken = BranchProfile.create();
+
         public KnownApplyNode(BareFunction func, Expr... args) {
+            this(func, false, args);
+        }
+
+        public KnownApplyNode(BareFunction func, boolean tail, Expr... args) {
             this.func = func;
             this.args = args;
+            this.tail = tail;
         }
 
         @Override
-        @ExplodeLoop
+        // @ExplodeLoop
         public Object executeGeneric(VirtualFrame frame) {
+            CompilerAsserts.compilationConstant(tail);
+            CompilerAsserts.compilationConstant(func);
+
             BareFunction funcValue = func;
-            Object[] argValues;
-            argValues = evalArgs(frame, args);
+            Object[] argValues = evalArgs(frame, args);
+            if (tail) {
+                throw InterpException.tailCall(funcValue, argValues);
+            }
             while (true) {
                 try {
                     return dispatchNode.executeDispatch(frame, funcValue, argValues);
                 } catch (InterpException.TrampolineException e) {
+                    // tailTaken.enter();
                     funcValue = e.func;
                     argValues = e.args;
                 }

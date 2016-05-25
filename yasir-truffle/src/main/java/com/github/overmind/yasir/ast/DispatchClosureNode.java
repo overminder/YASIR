@@ -15,9 +15,10 @@ public abstract class DispatchClosureNode extends Node {
                                            BareFunction function,
                                            Object[] arguments);
 
+
     // Using an assumption is usually better than using only a equality check, especially
     // when the closure is a compilation constant.
-    @Specialization(limit = "INLINE_CACHE_SIZE", guards = "function.target() == cachedFunction.target()", assumptions = "cachedFunction.targetNotChanged()")
+    @Specialization(limit = "INLINE_CACHE_SIZE", guards = "function == cachedFunction", assumptions = "cachedFunction.targetNotChanged()")
     protected static Object doDirect(VirtualFrame frame, BareFunction function, Object[] arguments, //
                                      @Cached("function") BareFunction cachedFunction, //
                                      @Cached("create(cachedFunction.target())") DirectCallNode callNode) {

@@ -1,5 +1,6 @@
 package com.github.overmind.yasir.ast;
 
+import com.oracle.truffle.api.dsl.UnsupportedSpecializationException;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.api.profiles.ConditionProfile;
@@ -22,10 +23,10 @@ public final class IfNode extends Expr {
 
     @Override
     public Object executeGeneric(VirtualFrame frame) {
+        // Binary profiles are not good for things like fibonacci: predicting the
+        // branch is useless in this case.
+        // However it will be pretty useful in other cases...
         try {
-            // Binary profiles are not good for things like fibonacci: predicting the
-            // branch is useless in this case.
-            // However it will be pretty useful in other cases...
             if (profile.profile(cond.executeBoolean(frame))) {
                 return onTrue.executeGeneric(frame);
             } else {

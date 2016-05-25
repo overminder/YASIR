@@ -1,6 +1,7 @@
 package com.github.overmind.yasir.ast;
 
 import com.github.overmind.yasir.Yasir;
+import com.github.overmind.yasir.interp.InterpException;
 import com.github.overmind.yasir.value.BareFunction;
 import com.github.overmind.yasir.value.Nil;
 import com.oracle.truffle.api.frame.*;
@@ -15,11 +16,188 @@ import static com.github.overmind.yasir.Simple.array;
 // Loops and tail calls.
 public final class TestLoopClosure {
     public static BareFunction create() {
-        return createPassingPrimOpsInFreshMatFrameIntoLocal();
+        return createTailcallWithExplicitMutatingCPSLoop();
     }
 
     public static long call(long n) {
         return (Long) Yasir.createCallTarget(ApplyNode.known(create(), PrimOp.lit(n))).call();
+    }
+
+    private static BareFunction createTailcallWithExplicitMutatingCPSLoop() {
+        FrameDescriptor fd = new FrameDescriptor();
+        // FrameSlot cont = fd.addFrameSlot("cont", FrameSlotKind.Object);
+        FrameSlot n = fd.addFrameSlot("n", FrameSlotKind.Object);
+        // FrameSlot i = fd.addFrameSlot("i", FrameSlotKind.Object);
+
+        BareFunction trampo = BareFunction.empty("loop-trampo");
+        BareFunction loop = BareFunction.empty("loop");   // [0]: i, [1]: s
+        BareFunction id = new BareFunction(Yasir.createCallTarget(Vars.read(0)), "id");
+
+        Object[] EMPTY = new Object[0];
+
+        trampo.setTarget(Yasir.createCallTarget(new Expr() {
+            @Child private Expr populateFrame = Vars.write(n, Vars.read(0));
+
+            @Child private LoopNode loopNode = Yasir.rt().createLoopNode(new FastRepNode(new Expr() {
+                @Child private Expr apply = ApplyNode.known(loop, Vars.read(n));
+
+                @Override
+                public Object executeGeneric(VirtualFrame frame) {
+                    long res = (Long) apply.executeGeneric(frame);
+                    if (res == -999L) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            },
+                    Vars.write(n, PrimOp.sub(Vars.read(n), PrimOp.lit(1)))
+            ));
+
+            @Child private Expr readRes = Vars.read(n);
+
+            // @Child private Expr getCont = Vars.read(cont);
+            // @Child private Expr getArgs = Vars.read(args);
+
+            @Override
+            public Object executeGeneric(VirtualFrame frame) {
+                // frame.setObject(cont, loop);
+                populateFrame.executeGeneric(frame);
+                // frame.setObject(args, array(n, 0L, id));
+                // BareFunction contValue = loop;
+                // Object[] argValues = (Object[]) array(n, 0L, id);
+
+                loopNode.executeLoop(frame);
+                return readRes.executeGeneric(frame);
+            }
+        }, fd));
+
+        FrameDescriptor innerFd = new FrameDescriptor();
+        FrameSlot innerI = innerFd.addFrameSlot("i");
+
+        loop.setTarget(Yasir.createCallTarget(Begin.create(
+                Vars.write(innerI, Vars.read(0)),
+                new IfNode(
+                        PrimOp.lt(Vars.read(innerI), PrimOp.lit(1)),
+                        Vars.read(innerI),
+                        PrimOp.lit(-999L)
+                )
+        ), innerFd));
+
+        return trampo;
+    }
+
+    // Too many allocations. This is only slightly better than the explicit tailcall
+    private static BareFunction createTailcallWithExplicitCPSLoop() {
+        FrameDescriptor fd = new FrameDescriptor();
+        FrameSlot cont = fd.addFrameSlot("cont", FrameSlotKind.Object);
+        FrameSlot args = fd.addFrameSlot("args", FrameSlotKind.Object);
+
+        BareFunction trampo = BareFunction.empty("loop-trampo");
+        BareFunction loop = BareFunction.empty("loop");   // [0]: i, [1]: s
+        BareFunction id = new BareFunction(Yasir.createCallTarget(Vars.read(0)), "id");
+
+        trampo.setTarget(Yasir.createCallTarget(new Expr() {
+            @Child private DispatchClosureNode dispatch = DispatchClosureNodeGen.create();
+            // @Child private Expr getCont = Vars.read(cont);
+            // @Child private Expr getArgs = Vars.read(args);
+
+            @Override
+            public Object executeGeneric(VirtualFrame frame) {
+                // frame.setObject(cont, loop);
+                long n = (Long) frame.getArguments()[0];
+                // frame.setObject(args, array(n, 0L, id));
+                BareFunction contValue = loop;
+                Object[] argValues = (Object[]) array(n, 0L, id);
+
+                while (true) {
+                    Object res = dispatch.executeDispatch(frame, contValue, argValues);
+                    if (res instanceof Object[]) {
+                        Object[] asArr = (Object[]) res;
+                        // frame.setObject(cont, asArr[0]);
+                        // frame.setObject(args, asArr[1]);
+                        contValue = (BareFunction) asArr[0];
+                        argValues = (Object[]) asArr[1];
+                    } else {
+                        return res;
+                    }
+                }
+            }
+        }, fd));
+
+        loop.setTarget(Yasir.createCallTarget(new Expr() {
+            @Override
+            public Object executeGeneric(VirtualFrame frame) {
+                Object[] loopArgs = frame.getArguments();
+                long i = (Long) loopArgs[0];
+                long s = (Long) loopArgs[1];
+                BareFunction k = (BareFunction) loopArgs[2];
+                if (i < 1) {
+                    return array(k, array(s));
+                } else {
+                    return array(loop, array(i - 1, s + i, k));
+                }
+            }
+        }));
+
+        return trampo;
+    }
+
+    // Same as passing the state in the arguments.
+    private static BareFunction createTailcallMutatingMatFrame() {
+        FrameDescriptor fd = new FrameDescriptor();
+        FrameSlot i = fd.addFrameSlot("i");
+        FrameSlot s = fd.addFrameSlot("s");
+        BareFunction trampo = BareFunction.empty("loop-trampo");
+        BareFunction loop = BareFunction.empty("loop");   // [0]: i, [1]: s
+
+        // Accessing the parent's frame through TruffleRuntime.getParentFrame cause a
+        // 'too deep inlining' error. Not sure why...
+        loop.setTarget(Yasir.createCallTarget(new IfNode(
+                PrimOp.lt(PrimOp.readMatFrame(Vars.read(0), i), PrimOp.lit(1)),
+                PrimOp.readMatFrame(Vars.read(0), s),
+                Begin.create(
+                        PrimOp.writeMatFrame(Vars.read(0), s,
+                                PrimOp.add(PrimOp.readMatFrame(Vars.read(0), s), PrimOp.readMatFrame(Vars.read(0), i))),
+                        PrimOp.writeMatFrame(Vars.read(0), i,
+                                PrimOp.sub(PrimOp.readMatFrame(Vars.read(0), i), PrimOp.lit(1))),
+                        ApplyNode.knownTail(loop, Vars.read(0))
+                )
+        )));
+
+        trampo.setTarget(Yasir.createCallTarget(Begin.create(
+                Vars.write(i, Vars.read(0)),
+                Vars.write(s, PrimOp.lit(0)),
+                ApplyNode.known(loop, PrimOp.matCurrentFrame())
+        ), fd));
+        return trampo;
+    }
+
+    // Very bad... at least 100x slowdown.
+    // Quote from http://markmail.org/message/ehou7ansc6dicllg#query:+page:1+mid:a6ruspukl4i4vgmq+state:results
+    // "That said, if Truffle does not see the exception thrown and caught in the
+    // same compilation scope there is some price to pay for tail calls atm, yes."
+    private static BareFunction createTailcallWithStateInArgs() {
+        FrameDescriptor fd = new FrameDescriptor();
+        FrameSlot i = fd.addFrameSlot("i");
+        FrameSlot s = fd.addFrameSlot("s");
+        BareFunction trampo = BareFunction.empty("loop-trampo");
+        BareFunction loop = BareFunction.empty("loop");   // [0]: i, [1]: s
+        loop.setTarget(Yasir.createCallTarget(Begin.create(
+                Vars.write(i, Vars.read(0)),
+                Vars.write(s, Vars.read(1)),
+                new IfNode(
+                        PrimOp.lt(Vars.read(i), PrimOp.lit(1)),
+                        Vars.read(s),
+                        ApplyNode.knownTail(loop,
+                                PrimOp.sub(Vars.read(i), PrimOp.lit(1)),
+                                PrimOp.add(Vars.read(s), Vars.read(i)))
+                )
+        ), fd));
+        trampo.setTarget(Yasir.createCallTarget(ApplyNode.known(loop,
+                Vars.read(0),
+                PrimOp.lit(0))));
+        return trampo;
     }
 
     // 1x. Storing the functions into local variables works.
@@ -139,6 +317,67 @@ public final class TestLoopClosure {
                         )
                 )
         ));
+        return trampo;
+    }
+
+    // Primops function passed in an mat frame.
+    // This incurs some (~4x) slow downs, but might be still acceptable. Note sure why
+    // this can't be optimized...
+    private static BareFunction createReadingPrimOpsFromParentsMatFrame() {
+        BareFunction trampo = BareFunction.empty("loop-pass-primops-trampo");
+        BareFunction loop = BareFunction.empty("loop-pass-primops");
+
+        FrameDescriptor fd = new FrameDescriptor();
+        FrameSlot i = fd.addFrameSlot("i");
+        FrameSlot s = fd.addFrameSlot("s");
+        FrameSlot arr = fd.addFrameSlot("arr");
+
+        FrameDescriptor trampoFd = new FrameDescriptor();
+        FrameSlot add = trampoFd.addFrameSlot("add");
+        FrameSlot sub = trampoFd.addFrameSlot("sub");
+        FrameSlot lt = trampoFd.addFrameSlot("lt");
+
+        loop.setTarget(Yasir.createCallTarget(Begin.create(
+                Vars.write(i, Vars.read(0)),
+                Vars.write(s, PrimOp.lit(0)),
+                Vars.write(arr, new Expr() {
+                    @Override
+                    public Object executeGeneric(VirtualFrame frame) {
+                        return Yasir.rt().getCallerFrame().getFrame(FrameInstance.FrameAccess.READ_ONLY, false);
+                    }
+                }),
+                new Expr() {
+                    @Child
+                    LoopNode loopBody = Yasir.rt().createLoopNode(
+                            new FastRepNode(
+                                    ApplyNode.unknown(PrimOp.readMatFrame(Vars.read(arr), lt),
+                                            PrimOp.lit(0), Vars.read(i)),
+                                    Begin.create(
+                                            Vars.write(s, ApplyNode.unknown(
+                                                    PrimOp.readMatFrame(Vars.read(arr), add),
+                                                    Vars.read(s), Vars.read(i))),
+                                            Vars.write(i, ApplyNode.unknown(
+                                                    PrimOp.readMatFrame(Vars.read(arr), sub),
+                                                    Vars.read(i), PrimOp.lit(1)))
+                                    )
+                            )
+                    );
+
+                    @Override
+                    public Object executeGeneric(VirtualFrame frame) {
+                        loopBody.executeLoop(frame);
+                        return Nil.INSTANCE;
+                    }
+                },
+                Vars.read(s)
+        ), fd));
+
+        trampo.setTarget(Yasir.createCallTarget(Begin.create(
+                Vars.write(add, PrimOp.lit(PrimOp.ADD)),
+                Vars.write(sub, PrimOp.lit(PrimOp.SUB)),
+                Vars.write(lt, PrimOp.lit(PrimOp.LT)),
+                ApplyNode.known(loop, Vars.read(0))
+        ), trampoFd));
         return trampo;
     }
 
@@ -314,15 +553,11 @@ public final class TestLoopClosure {
 
             @Override
             public boolean executeRepeating(VirtualFrame frame) {
-                try {
-                    if (check.executeBoolean(frame)) {
-                        body.executeGeneric(frame);
-                        return true;
-                    } else {
-                        return false;
-                    }
-                } catch (UnexpectedResultException e) {
-                    throw new RuntimeException(e);
+                if ((Boolean) check.executeGeneric(frame)) {
+                    body.executeGeneric(frame);
+                    return true;
+                } else {
+                    return false;
                 }
             }
         }
@@ -330,11 +565,7 @@ public final class TestLoopClosure {
         Expr simpleReadS = new Expr() {
             @Override
             public Object executeGeneric(VirtualFrame frame) {
-                try {
-                    return frame.getObject(s);
-                } catch (FrameSlotTypeException e) {
-                    throw new RuntimeException(e);
-                }
+                return frame.getValue(s);
             }
         };
 
@@ -346,15 +577,7 @@ public final class TestLoopClosure {
                     @Child private Expr result = Vars.read(s);
                     @Override
                     public Object executeGeneric(VirtualFrame frame) {
-                        // frame.setObject(i, frame.getArguments()[0]);
-                        // frame.setObject(s, 0L);
                         loopBody.executeLoop(frame);
-
-                        // try {
-                        //     return frame.getObject(s);
-                        // } catch (FrameSlotTypeException e) {
-                        //     throw new RuntimeException(e);
-                        // }
                         return result.executeGeneric(frame);
                     }
         }), fd));
@@ -373,16 +596,12 @@ public final class TestLoopClosure {
         class LoopBody extends Node implements RepeatingNode {
             @Override
             public boolean executeRepeating(VirtualFrame frame) {
-                try {
-                    if ((Long) frame.getValue(i) > 0) {
-                        frame.setObject(s, (Long) frame.getObject(i) + (Long) frame.getObject(s));
-                        frame.setObject(i, (Long) frame.getObject(i) - 1L);
-                        return true;
-                    } else {
-                        return false;
-                    }
-                } catch (FrameSlotTypeException e) {
-                    throw new RuntimeException(e);
+                if ((Long) frame.getValue(i) > 0) {
+                    frame.setObject(s, (Long) frame.getValue(i) + (Long) frame.getValue(s));
+                    frame.setObject(i, (Long) frame.getValue(i) - 1L);
+                    return true;
+                } else {
+                    return false;
                 }
             }
         }
@@ -394,11 +613,7 @@ public final class TestLoopClosure {
                 frame.setObject(i, frame.getArguments()[0]);
                 frame.setObject(s, 0L);
                 loopBody.executeLoop(frame);
-                try {
-                    return frame.getObject(s);
-                } catch (FrameSlotTypeException e) {
-                    throw new RuntimeException(e);
-                }
+                return frame.getValue(s);
             }
         }, fd));
 
@@ -461,7 +676,7 @@ public final class TestLoopClosure {
         FrameSlot s = fd.addFrameSlot("s");
 
         loop.setTarget(Yasir.createCallTarget(Begin.create(
-                Vars.write(i, Vars.read(1)),
+                Vars.write(i, Vars.read(0)),
                 Vars.write(s, PrimOp.lit(0)),
                 new Expr() {
                     @Child
@@ -485,11 +700,11 @@ public final class TestLoopClosure {
         ), fd));
 
         trampo.setTarget(Yasir.createCallTarget(
-                ApplyNode.unknownWithPayload(PrimOp.lit(loop), Vars.read(0))));
+                ApplyNode.known(loop, Vars.read(0))));
         return trampo;
     }
 
-    static class FastRepNode extends Node implements RepeatingNode {
+    static final class FastRepNode extends Node implements RepeatingNode {
         @Child
         private Expr check;
 

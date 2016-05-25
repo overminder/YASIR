@@ -94,6 +94,10 @@ public final class PrimOp {
         return ReadNonlocalNodeGen.create(matFrame, ix);
     }
 
+    public static Expr writeMatFrame(Expr matFrame, FrameSlot ix, Expr value) {
+        return WriteNonlocalNodeGen.create(matFrame, value, ix);
+    }
+
     public static Expr matCurrentFrame() {
         return new Expr() {
             @Override

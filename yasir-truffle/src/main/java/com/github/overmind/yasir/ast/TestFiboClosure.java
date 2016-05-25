@@ -344,108 +344,6 @@ public final class TestFiboClosure {
         return fibo;
     }
 
-    static BareFunction createFastCPSWithMatFrameBasedClosure() {
-        BareFunction fiboEntryB = BareFunction.empty("fibo-entry"),
-                fiboRet1C = BareFunction.empty("fibo-ret1"),
-                fiboRet2C = BareFunction.empty("fibo-ret2");
-        Closure fiboEntryC = fiboEntryB.withPayloads(array());
-        Expr fiboEntry, fiboRet1, fiboRet2;
-        {
-            fiboEntry = new Expr() {
-                Expr isBaseCase = PrimOp.lt(readN(), PrimOp.lit(2));
-                Expr nSub1 = PrimOp.sub(readN(), PrimOp.lit(1));
-                Expr mkK = Closures.alloc(fiboRet1C, readN(), readK());
-                Expr recurNode = ApplyNode.unknownWithPayload(PrimOp.lit(fiboEntryC), nSub1, mkK);
-                @Child Expr body = new IfNode(isBaseCase,
-                        ApplyNode.unknownWithPayload(readK(), readN()),
-                        recurNode);
-
-                private Expr readN() {
-                    return Vars.read(1);
-                }
-
-                private Expr readK() {
-                    return Vars.read(2);
-                }
-
-                @Override
-                public Object executeGeneric(VirtualFrame frame) {
-                    return body.executeGeneric(frame);
-                }
-            };
-        }
-
-        {
-            fiboRet1 = new Expr() {
-                Expr nSub2 = PrimOp.sub(readN(), PrimOp.lit(2));
-                Expr mkK = Closures.alloc(fiboRet2C, readRes(), readK());
-                Expr recurNode = ApplyNode.unknownWithPayload(PrimOp.lit(fiboEntryC), nSub2, mkK);
-                @Child Expr body = recurNode;
-
-                private Expr readClosure() {
-                    return Vars.read(0);
-                }
-
-                private Expr readRes() {
-                    return Vars.read(1);
-                }
-
-                private Expr readN() {
-                    return PrimOp.readPayload(readClosure(), 0);
-                }
-
-                private Expr readK() {
-                    return PrimOp.readPayload(readClosure(), 1);
-                }
-
-                @Override
-                public Object executeGeneric(VirtualFrame frame) {
-                    return body.executeGeneric(frame);
-                }
-            };
-        }
-
-        {
-            fiboRet2 = new Expr() {
-                Expr add = PrimOp.add(readRes(), readPrevRes());
-                @Child Expr body = ApplyNode.unknownWithPayload(readK(), add);
-
-                private Expr readClosure() {
-                    return Vars.read(0);
-                }
-
-                private Expr readRes() {
-                    return Vars.read(1);
-                }
-
-                private Expr readPrevRes() {
-                    return PrimOp.readPayload(readClosure(), 0);
-                }
-
-                private Expr readK() {
-                    return PrimOp.readPayload(readClosure(), 1);
-                }
-
-                @Override
-                public Object executeGeneric(VirtualFrame frame) {
-                    return body.executeGeneric(frame);
-                }
-            };
-        }
-
-        fiboEntryB.setTarget(Yasir.rt().createCallTarget(RootEntry.create(fiboEntry)));
-        fiboRet1C.setTarget(Yasir.rt().createCallTarget(RootEntry.create(fiboRet1)));
-        fiboRet2C.setTarget(Yasir.rt().createCallTarget(RootEntry.create(fiboRet2)));
-
-        BareFunction idB = new BareFunction(Yasir.rt().createCallTarget(RootEntry.create(Vars.read(1))), "id");
-        Closure idC = idB.withPayloads(array());
-        BareFunction fibo = new BareFunction(Yasir.rt().createCallTarget(RootEntry.create(
-                ApplyNode.known(fiboEntryB, PrimOp.lit(fiboEntryB), Vars.read(0), PrimOp.lit(idC)))),
-                "fibo");
-
-        return fibo;
-    }
-
     static class InjectBoxedClosureThroughCompilationContext extends Expr {
         @Child
         private Expr body;
@@ -920,11 +818,7 @@ public final class TestFiboClosure {
         }
 
         long readArg(VirtualFrame frame) {
-            try {
-                return readArg.executeLong(frame);
-            } catch (UnexpectedResultException e) {
-                throw new RuntimeException(e);
-            }
+            return (Long) readArg.executeGeneric(frame);
         }
 
         long readN(VirtualFrame frame) {
@@ -936,14 +830,10 @@ public final class TestFiboClosure {
             // frame.setLong(n, readN(frame));
             populateFrame.executeGeneric(frame);
 
-            try {
-                if (isBaseCase.executeBoolean(frame)) {
-                    return readN(frame);
-                } else {
-                    return recurNode.executeGeneric(frame);
-                }
-            } catch (UnexpectedResultException e) {
-                throw new RuntimeException(e);
+            if ((Boolean) isBaseCase.executeGeneric(frame)) {
+                return readN(frame);
+            } else {
+                return recurNode.executeGeneric(frame);
             }
         }
     }

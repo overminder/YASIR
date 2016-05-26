@@ -16,12 +16,12 @@ public class Simple {
         FrameSlot nSlot = mainFd.addFrameSlot("n");
         Expr main = MkLambda.create("main", array(nSlot), array(funcSlot),
                 Begin.create(
-                        Vars.writeBox(funcSlot, PrimOp.lit(c)),
+                        Vars.writeBox(funcSlot, PrimOp.litO(c)),
 
                         // Warmup. Loops needs 2 more times for OSR and the function body.
-                        ApplyNode.unknown(Vars.readBox(funcSlot), PrimOp.lit(warmupN)),
-                        ApplyNode.unknown(Vars.readBox(funcSlot), PrimOp.lit(warmupN)),
-                        ApplyNode.unknown(Vars.readBox(funcSlot), PrimOp.lit(warmupN)),
+                        ApplyNode.unknown(Vars.readBox(funcSlot), PrimOp.litO(warmupN)),
+                        ApplyNode.unknown(Vars.readBox(funcSlot), PrimOp.litO(warmupN)),
+                        ApplyNode.unknown(Vars.readBox(funcSlot), PrimOp.litO(warmupN)),
 
                         // Actual bench.
                         PrimOp.bench(
@@ -31,7 +31,7 @@ public class Simple {
                 ),
                 mainFd);
 
-        return ApplyNode.unknown(main, PrimOp.lit(n));
+        return ApplyNode.unknown(main, PrimOp.litO(n));
     }
 
 }

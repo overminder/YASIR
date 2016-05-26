@@ -5,6 +5,7 @@ import com.github.overmind.yasir.value.BareFunction;
 import com.github.overmind.yasir.value.Box;
 import com.github.overmind.yasir.value.Closure;
 import com.github.overmind.yasir.value.Nil;
+import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.dsl.*;
 import com.oracle.truffle.api.frame.FrameDescriptor;
@@ -25,15 +26,19 @@ public final class PrimOp {
         return PrimOpFactory.SubFactory.create(lhs, rhs);
     }
 
+    public static Expr longEq(Expr lhs, Expr rhs) {
+        return PrimOpFactory.LongEqFactory.create(lhs, rhs);
+    }
+
     public static Expr lt(Expr lhs, Expr rhs) {
         return PrimOpFactory.LtFactory.create(lhs, rhs);
     }
 
-    public static Expr lit(long v) {
+    public static Expr litO(long v) {
         return PrimOpFactory.LongLitNodeGen.create(v);
     }
 
-    public static Expr lit(Object o) {
+    public static Expr litObj(Object o) {
         return PrimOpFactory.ObjectLitNodeGen.create(o);
     }
 
@@ -88,6 +93,26 @@ public final class PrimOp {
 
     public static Expr readArray(Expr array, int ix) {
         return PrimOpFactory.ReadFixedArraySlotNodeGen.create(array, ix);
+    }
+
+    public static Expr writeArray(Expr array, int ix, Expr value) {
+        return WriteFixedArraySlotGen.create(array, value, ix);
+    }
+
+    public static Expr allocArray(Expr... items) {
+        Expr builder = new Expr() {
+            @Override
+            public Object executeGeneric(VirtualFrame frame) {
+                CompilerAsserts.compilationConstant(items.length);
+                return new Object[items.length];
+            }
+        };
+
+        for (int i = 0; i < items.length; ++i) {
+            Expr item = items[i];
+            builder = WriteFixedArraySlotGen.create(builder, item, i);
+        }
+        return builder;
     }
 
     public static Expr readMatFrame(Expr matFrame, FrameSlot ix) {
@@ -163,6 +188,17 @@ public final class PrimOp {
         }
     }
 
+    @NodeChildren({@NodeChild("array"), @NodeChild("value")})
+    @NodeField(name = "ix", type = int.class)
+    static abstract class WriteFixedArraySlot extends Expr {
+        abstract int getIx();
+        @Specialization
+        protected Object write(Object[] array, Object value) {
+            array[getIx()] = value;
+            return Nil.INSTANCE;
+        }
+    }
+
     @NodeChild("closure")
     @NodeField(name = "ix", type = int.class)
     static abstract class ReadClosurePayload extends Expr {
@@ -191,6 +227,13 @@ public final class PrimOp {
         @Specialization
         protected long doLong(long lhs, long rhs) {
             return lhs + rhs;
+        }
+    }
+
+    static abstract class LongEq extends Binary {
+        @Specialization
+        protected boolean doLong(long lhs, long rhs) {
+            return lhs == rhs;
         }
     }
 

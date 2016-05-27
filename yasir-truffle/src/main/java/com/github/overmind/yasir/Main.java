@@ -21,7 +21,7 @@ public class Main {
 
     static void bench() {
         Expr fiboN = Simple.makeBench(
-                5, // count
+                1, // count
                 /*
                 100000, // warmup
                 100000000, // arg

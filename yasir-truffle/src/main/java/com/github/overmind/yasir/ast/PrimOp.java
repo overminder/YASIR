@@ -30,11 +30,15 @@ public final class PrimOp {
         return PrimOpFactory.LongEqFactory.create(lhs, rhs);
     }
 
+    public static Expr longNeq(Expr lhs, Expr rhs) {
+        return PrimOpFactory.LongNeqFactory.create(lhs, rhs);
+    }
+
     public static Expr lt(Expr lhs, Expr rhs) {
         return PrimOpFactory.LtFactory.create(lhs, rhs);
     }
 
-    public static Expr litO(long v) {
+    public static Expr litL(long v) {
         return PrimOpFactory.LongLitNodeGen.create(v);
     }
 
@@ -96,7 +100,7 @@ public final class PrimOp {
     }
 
     public static Expr writeArray(Expr array, int ix, Expr value) {
-        return WriteFixedArraySlotGen.create(array, value, ix);
+        return PrimOpFactory.WriteFixedArraySlotNodeGen.create(array, value, ix);
     }
 
     public static Expr allocArray(Expr... items) {
@@ -110,7 +114,7 @@ public final class PrimOp {
 
         for (int i = 0; i < items.length; ++i) {
             Expr item = items[i];
-            builder = WriteFixedArraySlotGen.create(builder, item, i);
+            builder = PrimOpFactory.WriteFixedArraySlotNodeGen.create(builder, item, i);
         }
         return builder;
     }
@@ -195,7 +199,7 @@ public final class PrimOp {
         @Specialization
         protected Object write(Object[] array, Object value) {
             array[getIx()] = value;
-            return Nil.INSTANCE;
+            return array;
         }
     }
 
@@ -234,6 +238,13 @@ public final class PrimOp {
         @Specialization
         protected boolean doLong(long lhs, long rhs) {
             return lhs == rhs;
+        }
+    }
+
+    static abstract class LongNeq extends Binary {
+        @Specialization
+        protected boolean doLong(long lhs, long rhs) {
+            return lhs != rhs;
         }
     }
 

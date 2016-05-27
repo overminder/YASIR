@@ -19,7 +19,7 @@ public final class TestLoopClosure {
     }
 
     public static long call(long n) {
-        return (Long) Yasir.createCallTarget(ApplyNode.known(create(), PrimOp.litO(n))).call();
+        return (Long) Yasir.createCallTarget(ApplyNode.known(create(), PrimOp.litL(n))).call();
     }
 
     // Slow because the argument allocation can't be removed. Using an exception is even 1.5x slower!
@@ -173,20 +173,20 @@ public final class TestLoopClosure {
         // Accessing the parent's frame through TruffleRuntime.getParentFrame cause a
         // 'too deep inlining' error. Not sure why...
         loop.setTarget(Yasir.createCallTarget(new IfNode(
-                PrimOp.lt(PrimOp.readMatFrame(Vars.read(0), i), PrimOp.litO(1)),
+                PrimOp.lt(PrimOp.readMatFrame(Vars.read(0), i), PrimOp.litL(1)),
                 PrimOp.readMatFrame(Vars.read(0), s),
                 Begin.create(
                         PrimOp.writeMatFrame(Vars.read(0), s,
                                 PrimOp.add(PrimOp.readMatFrame(Vars.read(0), s), PrimOp.readMatFrame(Vars.read(0), i))),
                         PrimOp.writeMatFrame(Vars.read(0), i,
-                                PrimOp.sub(PrimOp.readMatFrame(Vars.read(0), i), PrimOp.litO(1))),
+                                PrimOp.sub(PrimOp.readMatFrame(Vars.read(0), i), PrimOp.litL(1))),
                         ApplyNode.knownTail(loop, Vars.read(0))
                 )
         )));
 
         trampo.setTarget(Yasir.createCallTarget(Begin.create(
                 Vars.write(i, Vars.read(0)),
-                Vars.write(s, PrimOp.litO(0)),
+                Vars.write(s, PrimOp.litL(0)),
                 ApplyNode.known(loop, PrimOp.matCurrentFrame())
         ), fd));
         return trampo;
@@ -206,16 +206,16 @@ public final class TestLoopClosure {
                 Vars.write(i, Vars.read(0)),
                 Vars.write(s, Vars.read(1)),
                 new IfNode(
-                        PrimOp.lt(Vars.read(i), PrimOp.litO(1)),
+                        PrimOp.lt(Vars.read(i), PrimOp.litL(1)),
                         Vars.read(s),
                         ApplyNode.knownTail(loop,
-                                PrimOp.sub(Vars.read(i), PrimOp.litO(1)),
+                                PrimOp.sub(Vars.read(i), PrimOp.litL(1)),
                                 PrimOp.add(Vars.read(s), Vars.read(i)))
                 )
         ), fd));
         trampo.setTarget(Yasir.createCallTarget(ApplyNode.known(loop,
                 Vars.read(0),
-                PrimOp.litO(0))));
+                PrimOp.litL(0))));
         return trampo;
     }
 
@@ -238,7 +238,7 @@ public final class TestLoopClosure {
 
         loop.setTarget(Yasir.createCallTarget(Begin.create(
                 Vars.write(i, Vars.read(0)),
-                Vars.write(s, PrimOp.litO(0)),
+                Vars.write(s, PrimOp.litL(0)),
                 Vars.write(addL, PrimOp.readMatFrame(Vars.read(1), add)),
                 Vars.write(subL, PrimOp.readMatFrame(Vars.read(1), sub)),
                 Vars.write(ltL, PrimOp.readMatFrame(Vars.read(1), lt)),
@@ -247,14 +247,14 @@ public final class TestLoopClosure {
                     LoopNode loopBody = Yasir.rt().createLoopNode(
                             new FastRepNode(
                                     ApplyNode.unknown(Vars.read(ltL),
-                                            PrimOp.litO(0), Vars.read(i)),
+                                            PrimOp.litL(0), Vars.read(i)),
                                     Begin.create(
                                             Vars.write(s, ApplyNode.unknown(
                                                     Vars.read(addL),
                                                     Vars.read(s), Vars.read(i))),
                                             Vars.write(i, ApplyNode.unknown(
                                                     Vars.read(subL),
-                                                    Vars.read(i), PrimOp.litO(1)))
+                                                    Vars.read(i), PrimOp.litL(1)))
                                     )
                             )
                     );
@@ -298,21 +298,21 @@ public final class TestLoopClosure {
 
         loop.setTarget(Yasir.createCallTarget(Begin.create(
                 Vars.write(i, Vars.read(0)),
-                Vars.write(s, PrimOp.litO(0)),
+                Vars.write(s, PrimOp.litL(0)),
                 Vars.write(arr, Vars.read(1)),
                 new Expr() {
                     @Child
                     LoopNode loopBody = Yasir.rt().createLoopNode(
                             new FastRepNode(
                                     ApplyNode.unknown(PrimOp.readMatFrame(Vars.read(arr), lt),
-                                            PrimOp.litO(0), Vars.read(i)),
+                                            PrimOp.litL(0), Vars.read(i)),
                                     Begin.create(
                                             Vars.write(s, ApplyNode.unknown(
                                                     PrimOp.readMatFrame(Vars.read(arr), add),
                                                     Vars.read(s), Vars.read(i))),
                                             Vars.write(i, ApplyNode.unknown(
                                                     PrimOp.readMatFrame(Vars.read(arr), sub),
-                                                    Vars.read(i), PrimOp.litO(1)))
+                                                    Vars.read(i), PrimOp.litL(1)))
                                     )
                             )
                     );
@@ -358,7 +358,7 @@ public final class TestLoopClosure {
 
         loop.setTarget(Yasir.createCallTarget(Begin.create(
                 Vars.write(i, Vars.read(0)),
-                Vars.write(s, PrimOp.litO(0)),
+                Vars.write(s, PrimOp.litL(0)),
                 Vars.write(arr, new Expr() {
                     @Override
                     public Object executeGeneric(VirtualFrame frame) {
@@ -370,14 +370,14 @@ public final class TestLoopClosure {
                     LoopNode loopBody = Yasir.rt().createLoopNode(
                             new FastRepNode(
                                     ApplyNode.unknown(PrimOp.readMatFrame(Vars.read(arr), lt),
-                                            PrimOp.litO(0), Vars.read(i)),
+                                            PrimOp.litL(0), Vars.read(i)),
                                     Begin.create(
                                             Vars.write(s, ApplyNode.unknown(
                                                     PrimOp.readMatFrame(Vars.read(arr), add),
                                                     Vars.read(s), Vars.read(i))),
                                             Vars.write(i, ApplyNode.unknown(
                                                     PrimOp.readMatFrame(Vars.read(arr), sub),
-                                                    Vars.read(i), PrimOp.litO(1)))
+                                                    Vars.read(i), PrimOp.litL(1)))
                                     )
                             )
                     );
@@ -419,21 +419,21 @@ public final class TestLoopClosure {
 
         loop.setTarget(Yasir.createCallTarget(Begin.create(
                 Vars.write(i, Vars.read(0)),
-                Vars.write(s, PrimOp.litO(0)),
+                Vars.write(s, PrimOp.litL(0)),
                 Vars.write(arr, Vars.read(1)),
                 new Expr() {
                     @Child
                     LoopNode loopBody = Yasir.rt().createLoopNode(
                             new FastRepNode(
                                     ApplyNode.unknown(PrimOp.readMatFrame(Vars.read(arr), lt),
-                                            PrimOp.litO(0), Vars.read(i)),
+                                            PrimOp.litL(0), Vars.read(i)),
                                     Begin.create(
                                             Vars.write(s, ApplyNode.unknown(
                                                     PrimOp.readMatFrame(Vars.read(arr), add),
                                                     Vars.read(s), Vars.read(i))),
                                             Vars.write(i, ApplyNode.unknown(
                                                     PrimOp.readMatFrame(Vars.read(arr), sub),
-                                                    Vars.read(i), PrimOp.litO(1)))
+                                                    Vars.read(i), PrimOp.litL(1)))
                                     )
                             )
                     );
@@ -471,21 +471,21 @@ public final class TestLoopClosure {
 
         loop.setTarget(Yasir.createCallTarget(Begin.create(
                 Vars.write(i, Vars.read(0)),
-                Vars.write(s, PrimOp.litO(0)),
+                Vars.write(s, PrimOp.litL(0)),
                 Vars.write(arr, Vars.read(1)),
                 new Expr() {
                     @Child
                     LoopNode loopBody = Yasir.rt().createLoopNode(
                             new FastRepNode(
                                     ApplyNode.unknown(PrimOp.readArray(Vars.read(arr), 2),
-                                            PrimOp.litO(0), Vars.read(i)),
+                                            PrimOp.litL(0), Vars.read(i)),
                                     Begin.create(
                                             Vars.write(s, ApplyNode.unknown(
                                                     PrimOp.readArray(Vars.read(arr), 0),
                                                     Vars.read(s), Vars.read(i))),
                                             Vars.write(i, ApplyNode.unknown(
                                                     PrimOp.readArray(Vars.read(arr), 1),
-                                                    Vars.read(i), PrimOp.litO(1)))
+                                                    Vars.read(i), PrimOp.litL(1)))
                                     )
                             )
                     );
@@ -520,7 +520,7 @@ public final class TestLoopClosure {
 
         loop.setTarget(Yasir.createCallTarget(Begin.create(
                 Vars.write(i, Vars.read(0)),
-                Vars.write(s, PrimOp.litO(0)),
+                Vars.write(s, PrimOp.litL(0)),
                 Vars.write(add, Vars.read(1)),
                 Vars.write(sub, Vars.read(2)),
                 Vars.write(lt, Vars.read(3)),
@@ -528,12 +528,12 @@ public final class TestLoopClosure {
                     @Child
                     LoopNode loopBody = Yasir.rt().createLoopNode(
                             new FastRepNode(
-                                    ApplyNode.unknown(Vars.read(lt), PrimOp.litO(0), Vars.read(i)),
+                                    ApplyNode.unknown(Vars.read(lt), PrimOp.litL(0), Vars.read(i)),
                                     Begin.create(
                                             Vars.write(s, ApplyNode.unknown(
                                                     Vars.read(add), Vars.read(s), Vars.read(i))),
                                             Vars.write(i, ApplyNode.unknown(
-                                                    Vars.read(sub), Vars.read(i), PrimOp.litO(1)))
+                                                    Vars.read(sub), Vars.read(i), PrimOp.litL(1)))
                                     )
                             )
                     );
@@ -550,9 +550,9 @@ public final class TestLoopClosure {
         trampo.setTarget(Yasir.createCallTarget(
                 ApplyNode.known(loop,
                         Vars.read(0),
-                        PrimOp.litO(PrimOp.ADD),
-                        PrimOp.litO(PrimOp.SUB),
-                        PrimOp.litO(PrimOp.LT))));
+                        PrimOp.litObj(PrimOp.ADD),
+                        PrimOp.litObj(PrimOp.SUB),
+                        PrimOp.litObj(PrimOp.LT))));
         return trampo;
     }
 
@@ -565,9 +565,9 @@ public final class TestLoopClosure {
         FrameSlot s = fd.addFrameSlot("s");
 
         class LoopBody extends Node implements RepeatingNode {
-            @Child Expr check = PrimOp.lt(PrimOp.litO(0L), Vars.read(i));
+            @Child Expr check = PrimOp.lt(PrimOp.litL(0L), Vars.read(i));
             Expr addSI = Vars.write(s, PrimOp.add(Vars.read(s), Vars.read(i)));
-            Expr subI1 = Vars.write(i, PrimOp.sub(Vars.read(i), PrimOp.litO(1)));
+            Expr subI1 = Vars.write(i, PrimOp.sub(Vars.read(i), PrimOp.litL(1)));
             @Child Expr body = Begin.create(addSI, subI1);
 
             @Override
@@ -590,7 +590,7 @@ public final class TestLoopClosure {
 
         loop.setTarget(Yasir.createCallTarget(Begin.create(
                 Vars.write(i, Vars.read(0)),
-                Vars.write(s, PrimOp.litO(0L)),
+                Vars.write(s, PrimOp.litL(0L)),
                 new Expr() {
                     @Child private LoopNode loopBody = Yasir.rt().createLoopNode(new LoopBody());
                     @Child private Expr result = Vars.read(s);
@@ -700,15 +700,15 @@ public final class TestLoopClosure {
 
         loop.setTarget(Yasir.createCallTarget(Begin.create(
                 Vars.write(i, Vars.read(0)),
-                Vars.write(s, PrimOp.litO(0)),
+                Vars.write(s, PrimOp.litL(0)),
                 new Expr() {
                     @Child
                     LoopNode loopBody = Yasir.rt().createLoopNode(
                             new FastRepNode(
-                                    PrimOp.lt(PrimOp.litO(0), Vars.read(i)),
+                                    PrimOp.lt(PrimOp.litL(0), Vars.read(i)),
                                     Begin.create(
                                             Vars.write(s, PrimOp.add(Vars.read(s), Vars.read(i))),
-                                            Vars.write(i, PrimOp.sub(Vars.read(i), PrimOp.litO(1)))
+                                            Vars.write(i, PrimOp.sub(Vars.read(i), PrimOp.litL(1)))
                                     )
                             )
                     );
@@ -741,15 +741,15 @@ public final class TestLoopClosure {
 
         loop.setTarget(Yasir.createCallTarget(Begin.create(
                 Vars.write(i, Vars.read(0)),
-                Vars.write(s, PrimOp.litO(0)),
+                Vars.write(s, PrimOp.litL(0)),
                 new Expr() {
                     @Child
                     LoopNode loopBody = Yasir.rt().createLoopNode(
                             new FastRepNode(
-                                    PrimOp.lt(PrimOp.litO(0), Vars.read(i)),
+                                    PrimOp.lt(PrimOp.litL(0), Vars.read(i)),
                                     Begin.create(
                                             Vars.write(s, PrimOp.add(Vars.read(s), Vars.read(i))),
-                                            Vars.write(i, PrimOp.sub(Vars.read(i), PrimOp.litO(1)))
+                                            Vars.write(i, PrimOp.sub(Vars.read(i), PrimOp.litL(1)))
                                     )
                             )
                     );

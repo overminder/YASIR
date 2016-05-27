@@ -27,7 +27,7 @@ import static com.github.overmind.yasir.Simple.array;
 // - pass wrapped primops in array (3x slow down)
 public final class TestFiboClosure {
     public static BareFunction create() {
-        return createFastCPSWithArrayBasedClosure();
+        return createLabeledCPS();
     }
 
     // Inlined primop nodes and constant closure pointer.
@@ -253,8 +253,8 @@ public final class TestFiboClosure {
         Expr fiboEntry, fiboRet1, fiboRet2;
         {
             fiboEntry = new Expr() {
-                Expr isBaseCase = PrimOp.lt(readN(), PrimOp.litO(2));
-                Expr nSub1 = PrimOp.sub(readN(), PrimOp.litO(1));
+                Expr isBaseCase = PrimOp.lt(readN(), PrimOp.litL(2));
+                Expr nSub1 = PrimOp.sub(readN(), PrimOp.litL(1));
                 Expr mkK = Closures.alloc(fiboRet1C, readN(), readK());
                 Expr recurNode = ApplyNode.unknownWithPayload(PrimOp.litObj(fiboEntryC), nSub1, mkK);
                 @Child Expr body = new IfNode(isBaseCase,
@@ -278,7 +278,7 @@ public final class TestFiboClosure {
 
         {
             fiboRet1 = new Expr() {
-                Expr nSub2 = PrimOp.sub(readN(), PrimOp.litO(2));
+                Expr nSub2 = PrimOp.sub(readN(), PrimOp.litL(2));
                 Expr mkK = Closures.alloc(fiboRet2C, readRes(), readK());
                 Expr recurNode = ApplyNode.unknownWithPayload(PrimOp.litObj(fiboEntryC), nSub2, mkK);
                 @Child Expr body = recurNode;
@@ -352,59 +352,57 @@ public final class TestFiboClosure {
         BareFunction fibo = BareFunction.empty("fibo");
         FrameDescriptor fd = new FrameDescriptor();
 
-        FrameSlot n = fd.addFrameSlot("n");
-        FrameSlot t = fd.addFrameSlot("t");
+        FrameSlot n = fd.addFrameSlot("n");  // first arg and ret val
+        FrameSlot t = fd.addFrameSlot("t");  // saved n
         FrameSlot cont = fd.addFrameSlot("cont");
         FrameSlot env = fd.addFrameSlot("env");
 
-        final long MAIN_ENTRY = 0,
-                FIBO_ENTRY = 1,
-                CALL_RET1 = 2,
-                CALL_RET2 = 3,
-                HALT = 4;
+        final long FIBO_ENTRY = 0,
+                CALL_RET1 = 1,
+                CALL_RET2 = 2,
+                HALT = 3;
 
         fibo.setTarget(Yasir.rt().createCallTarget(RootEntry.create(new Expr() {
             @Child Expr populateFrame = Begin.create(
                     Vars.write(n, Vars.read(0)),
-                    Vars.write(cont, PrimOp.litO(FIBO_ENTRY)),
-                    Vars.write(env, PrimOp.litObj(array(HALT, Nil.INSTANCE)))
+                    Vars.write(cont, PrimOp.litL(FIBO_ENTRY)),
+                    Vars.write(env, PrimOp.litObj(array(HALT, Nil.INSTANCE, Nil.INSTANCE)))
             );
 
             @Child LoopNode loopNode = Yasir.rt().createLoopNode(new TestLoopClosure.FastRepNode(
-                    PrimOp.longEq(Vars.read(cont), PrimOp.litO(HALT)),
+                    PrimOp.longNeq(Vars.read(cont), PrimOp.litL(HALT)),
                     new Expr() {
                         @Child
                         Expr readCont = Vars.read(cont);
 
                         @Child
                         Expr fiboEntry = new IfNode(
-                                PrimOp.lt(Vars.read(n), PrimOp.litO(2)),
+                                PrimOp.lt(Vars.read(n), PrimOp.litL(2)),
                                 runCont(Vars.read(n)),
                                 allocContAndJump(CALL_RET1, Vars.read(env), Vars.read(n),
-                                        FIBO_ENTRY, PrimOp.sub(Vars.read(n), PrimOp.litO(1)))
+                                        FIBO_ENTRY, PrimOp.sub(Vars.read(n), PrimOp.litL(1)))
                         );
 
                         @Child
-                        Expr fiboRet1 = Begin.create(
-                                Vars.write(t, Vars.read(n)),
-                                Vars.write(n, PrimOp.readArray(Vars.read(env), 2)),
-                                allocContAndJump(CALL_RET2, Vars.read(env), PrimOp.litObj(Nil.INSTANCE),
-                                        FIBO_ENTRY, x
-                        );
+                        Expr fiboRet1 = allocContAndJump(CALL_RET2, Vars.read(env), Vars.read(n),
+                                FIBO_ENTRY, PrimOp.sub(Vars.read(t), PrimOp.litL(2)));
+
+                        @Child
+                        Expr fiboRet2 = runCont(PrimOp.add(Vars.read(n), Vars.read(t)));
 
                         private Expr allocContAndJump(long contV, Expr readEnv, Expr readN, long jumpTo, Expr withArg) {
                             return new Expr() {
                                 @Child
-                                Expr pushCont = Vars.write(env, PrimOp.allocArray(PrimOp.litO(contV), readEnv, readN));
+                                Expr pushCont = Vars.write(env, PrimOp.allocArray(PrimOp.litL(contV), readEnv, readN));
                                 @Child
                                 Expr writeArg = Vars.write(n, withArg);
                                 @Child
-                                Expr jump = Vars.write(cont, PrimOp.litO(jumpTo));
+                                Expr jump = Vars.write(cont, PrimOp.litL(jumpTo));
 
                                 @Override
                                 public Object executeGeneric(VirtualFrame frame) {
                                     pushCont.executeGeneric(frame);
-                                    writeArg.executeGeneric(frame;)
+                                    writeArg.executeGeneric(frame);
                                     jump.executeGeneric(frame);
                                     return Nil.INSTANCE;
                                 }
@@ -419,11 +417,14 @@ public final class TestFiboClosure {
                                 Expr popCont = Vars.write(cont, PrimOp.readArray(Vars.read(env), 0));
                                 @Child
                                 Expr popEnv = Vars.write(env, PrimOp.readArray(Vars.read(env), 1));
+                                @Child
+                                Expr popSavedN = Vars.write(t, PrimOp.readArray(Vars.read(env), 2));
 
                                 @Override
                                 public Object executeGeneric(VirtualFrame frame) {
                                     writeRetVal.executeGeneric(frame);
                                     popCont.executeGeneric(frame);
+                                    popSavedN.executeGeneric(frame);
                                     popEnv.executeGeneric(frame);
                                     return Nil.INSTANCE;
                                 }
@@ -439,8 +440,10 @@ public final class TestFiboClosure {
                                         fiboEntry.executeGeneric(frame);
                                         break;
                                     case (int) CALL_RET1:
+                                        fiboRet1.executeGeneric(frame);
                                         break;
                                     case (int) CALL_RET2:
+                                        fiboRet2.executeGeneric(frame);
                                         break;
                                     default:
                                         throw new RuntimeException("Unepected label: " + lbl);
@@ -482,9 +485,9 @@ public final class TestFiboClosure {
             this.sub = new Box(sub);
             this.lt = new Box(lt);
 
-            Expr isBaseCase = ApplyNode.unknown(readLt(), readN(), PrimOp.litO(2));
-            Expr nSub1 = ApplyNode.unknown(readSub(), readN(), PrimOp.litO(1));
-            Expr nSub2 = ApplyNode.unknown(readSub(), readN(), PrimOp.litO(2));
+            Expr isBaseCase = ApplyNode.unknown(readLt(), readN(), PrimOp.litL(2));
+            Expr nSub1 = ApplyNode.unknown(readSub(), readN(), PrimOp.litL(1));
+            Expr nSub2 = ApplyNode.unknown(readSub(), readN(), PrimOp.litL(2));
             Expr ap1 = ApplyNode.unknown(readFibo(), nSub1);
             Expr ap2 = ApplyNode.unknown(readFibo(), nSub2);
             Expr recurNode = ApplyNode.unknown(readAdd(), ap1, ap2);
@@ -532,9 +535,9 @@ public final class TestFiboClosure {
             this.sub = sub;
             this.lt = lt;
 
-            Expr isBaseCase = ApplyNode.unknown(readLt(), readN(), PrimOp.litO(2));
-            Expr nSub1 = ApplyNode.unknown(readSub(), readN(), PrimOp.litO(1));
-            Expr nSub2 = ApplyNode.unknown(readSub(), readN(), PrimOp.litO(2));
+            Expr isBaseCase = ApplyNode.unknown(readLt(), readN(), PrimOp.litL(2));
+            Expr nSub1 = ApplyNode.unknown(readSub(), readN(), PrimOp.litL(1));
+            Expr nSub2 = ApplyNode.unknown(readSub(), readN(), PrimOp.litL(2));
             Expr ap1 = ApplyNode.unknown(readFibo(), nSub1);
             Expr ap2 = ApplyNode.unknown(readFibo(), nSub2);
             Expr recurNode = ApplyNode.unknown(readAdd(), ap1, ap2);
@@ -601,9 +604,9 @@ public final class TestFiboClosure {
                     Vars.write(ltL, readLt())
             );
 
-            Expr isBaseCase = ApplyNode.unknown(readLtL(), readN(), PrimOp.litO(2));
-            Expr nSub1 = ApplyNode.unknown(readSubL(), readN(), PrimOp.litO(1));
-            Expr nSub2 = ApplyNode.unknown(readSubL(), readN(), PrimOp.litO(2));
+            Expr isBaseCase = ApplyNode.unknown(readLtL(), readN(), PrimOp.litL(2));
+            Expr nSub1 = ApplyNode.unknown(readSubL(), readN(), PrimOp.litL(1));
+            Expr nSub2 = ApplyNode.unknown(readSubL(), readN(), PrimOp.litL(2));
             Expr ap1 = ApplyNode.unknown(readFiboL(), nSub1,
                     readPayload());
             Expr ap2 = ApplyNode.unknown(readFiboL(), nSub2,
@@ -673,9 +676,9 @@ public final class TestFiboClosure {
             this.sub = sub;
             this.lt = lt;
 
-            Expr isBaseCase = ApplyNode.unknown(readLt(), readN(), PrimOp.litO(2));
-            Expr nSub1 = ApplyNode.unknown(readSub(), readN(), PrimOp.litO(1));
-            Expr nSub2 = ApplyNode.unknown(readSub(), readN(), PrimOp.litO(2));
+            Expr isBaseCase = ApplyNode.unknown(readLt(), readN(), PrimOp.litL(2));
+            Expr nSub1 = ApplyNode.unknown(readSub(), readN(), PrimOp.litL(1));
+            Expr nSub2 = ApplyNode.unknown(readSub(), readN(), PrimOp.litL(2));
             Expr ap1 = ApplyNode.unknown(readFibo(), nSub1,
                     readPayload());
             Expr ap2 = ApplyNode.unknown(readFibo(), nSub2,
@@ -722,9 +725,9 @@ public final class TestFiboClosure {
         private Expr body;
 
         PassMoreFuncInArray() {
-            Expr isBaseCase = ApplyNode.unknown(readLt(), readN(), PrimOp.litO(2));
-            Expr nSub1 = ApplyNode.unknown(readSub(), readN(), PrimOp.litO(1));
-            Expr nSub2 = ApplyNode.unknown(readSub(), readN(), PrimOp.litO(2));
+            Expr isBaseCase = ApplyNode.unknown(readLt(), readN(), PrimOp.litL(2));
+            Expr nSub1 = ApplyNode.unknown(readSub(), readN(), PrimOp.litL(1));
+            Expr nSub2 = ApplyNode.unknown(readSub(), readN(), PrimOp.litL(2));
             Expr ap1 = ApplyNode.unknown(readFibo(), nSub1,
                     readPayload());
             Expr ap2 = ApplyNode.unknown(readFibo(), nSub2,
@@ -769,9 +772,9 @@ public final class TestFiboClosure {
         private Expr body;
 
         PassMoreFunc() {
-            Expr isBaseCase = PrimOp.callLt(readN(), PrimOp.litO(2));
-            Expr nSub1 = ApplyNode.unknown(readSub(), readN(), PrimOp.litO(1));
-            Expr nSub2 = ApplyNode.unknown(readSub(), readN(), PrimOp.litO(2));
+            Expr isBaseCase = PrimOp.callLt(readN(), PrimOp.litL(2));
+            Expr nSub1 = ApplyNode.unknown(readSub(), readN(), PrimOp.litL(1));
+            Expr nSub2 = ApplyNode.unknown(readSub(), readN(), PrimOp.litL(2));
             Expr ap1 = ApplyNode.unknown(readFibo(), nSub1,
                     readFibo(),
                     readAdd(),
@@ -818,10 +821,10 @@ public final class TestFiboClosure {
         private Expr body;
 
         PassFuncBoxed() {
-            Expr isBaseCase = PrimOp.lt(readN(), PrimOp.litO(2));
+            Expr isBaseCase = PrimOp.lt(readN(), PrimOp.litL(2));
             Expr recurNode = PrimOp.add(
-                    ApplyNode.unknown(readFiboUnbox(), PrimOp.sub(readN(), PrimOp.litO(1)), readFibo()),
-                    ApplyNode.unknown(readFiboUnbox(), PrimOp.sub(readN(), PrimOp.litO(2)), readFibo()));
+                    ApplyNode.unknown(readFiboUnbox(), PrimOp.sub(readN(), PrimOp.litL(1)), readFibo()),
+                    ApplyNode.unknown(readFiboUnbox(), PrimOp.sub(readN(), PrimOp.litL(2)), readFibo()));
             body = new IfNode(isBaseCase, readN(), recurNode);
         }
 
@@ -849,10 +852,10 @@ public final class TestFiboClosure {
         private Expr body;
 
         PassFunc() {
-            Expr isBaseCase = PrimOp.lt(readN(), PrimOp.litO(2));
+            Expr isBaseCase = PrimOp.lt(readN(), PrimOp.litL(2));
             Expr recurNode = PrimOp.add(
-                    ApplyNode.unknown(readFibo(), PrimOp.sub(readN(), PrimOp.litO(1)), readFibo()),
-                    ApplyNode.unknown(readFibo(), PrimOp.sub(readN(), PrimOp.litO(2)), readFibo()));
+                    ApplyNode.unknown(readFibo(), PrimOp.sub(readN(), PrimOp.litL(1)), readFibo()),
+                    ApplyNode.unknown(readFibo(), PrimOp.sub(readN(), PrimOp.litL(2)), readFibo()));
             body = new IfNode(isBaseCase, readN(), recurNode);
         }
 
@@ -884,10 +887,10 @@ public final class TestFiboClosure {
             this.n = n;
 
             populateFrame = WriteLocalNodeGen.create(readArg(), n);
-            Expr isBaseCase = PrimOp.lt(readLocal(), PrimOp.litO(2));
+            Expr isBaseCase = PrimOp.lt(readLocal(), PrimOp.litL(2));
             Expr recurNode = PrimOp.add(
-                    ApplyNode.unknown(PrimOp.litObj(fibo), PrimOp.sub(readLocal(), PrimOp.litO(1))),
-                    ApplyNode.unknown(PrimOp.litObj(fibo), PrimOp.sub(readLocal(), PrimOp.litO(2))));
+                    ApplyNode.unknown(PrimOp.litObj(fibo), PrimOp.sub(readLocal(), PrimOp.litL(1))),
+                    ApplyNode.unknown(PrimOp.litObj(fibo), PrimOp.sub(readLocal(), PrimOp.litL(2))));
             body = new IfNode(isBaseCase, readLocal(), recurNode);
         }
 
@@ -917,9 +920,9 @@ public final class TestFiboClosure {
         @Child
         private Expr readLocal;
         @Child
-        private Expr lit1Node = PrimOp.litO(1);
+        private Expr lit1Node = PrimOp.litL(1);
         @Child
-        private Expr lit2Node = PrimOp.litO(2);
+        private Expr lit2Node = PrimOp.litL(2);
         // @Child private Expr body;
         @Child
         private Expr isBaseCase;

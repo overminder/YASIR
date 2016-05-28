@@ -1,1 +1,2 @@
+main :: IO ()
 main = return ()
